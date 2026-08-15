@@ -2,20 +2,23 @@
  * maple-starforce-analyzer - optimizer.js
  * 동적계획법(DP / Bellman Equation) 기반 강화 최적화 엔진
  * 
- * 각 성수별 [파괴방지 사용 / 확정복구 사용 / 12성 롤백] 중
- * 기댓값 비용이 최소가 되는 최적의 전략을 도출합니다.
+ * 12성 롤백 손실 = (baseCost + 12->s성 누적 기댓값)
+ * 확정 복구 손실 = (spareCount * baseCost + 할인된 복구 메소)
+ * 파괴방지 비용 = 2 * 노할인 기본비용
+ * 
+ * 세 가지 전략 중 최소 비용 경로를 엄밀하게 도출합니다.
  */
 
-import { STARFORCE_CONFIG, getCosts, getProbTable, getRestoreTotalCost } from './starforceData.js';
+import { STARFORCE_CONFIG, getCosts, getRestoreTotalCost } from './starforceData.js';
 
 export class StarforceOptimizer {
   /**
-   * getOptimalReinforcement 구현
+   * getOptimalReinforcement
    * @param {Object} item - { level, baseCost }
    * @param {string|null} event - 이벤트
    * @param {number} mvpDiscount - MVP 할인율
    * @param {boolean} pcRoom - PC방 할인 여부
-   * @returns {Object} { destroyPrevention: number[], restore: number[], stepDetails: Array }
+   * @returns {Object}
    */
   static getOptimalReinforcement(item, event = null, mvpDiscount = 0, pcRoom = false) {
     const level = item.level;
@@ -26,13 +29,7 @@ export class StarforceOptimizer {
     let discountRatio = mvpDiscount;
     if (pcRoom) discountRatio += 0.05;
 
-    const eventsWithGlobalCostDiscount = [
-      '30% 할인',
-      '샤타포스',
-      '샤타포스(+흔적 복구 비용 20% 할인)',
-      '샤타포스(15 16 포함)'
-    ];
-    const isGlobalDiscount = event !== null && eventsWithGlobalCostDiscount.includes(event);
+    const isGlobalDiscount = event !== null && (event.includes('30%') || event.includes('샤이닝') || event.includes('샤타'));
 
     const discountedCosts = defaultCosts.map((cost, index) => {
       let c = index < 17 ? cost * (1 - discountRatio) : cost;
@@ -40,18 +37,19 @@ export class StarforceOptimizer {
       return Math.round(c);
     });
 
-    const isDestroyReduction = event !== null && (event.includes('파괴') || event.includes('샤이닝'));
+    const isDestroyReduction = event !== null && (event.includes('파괴') || event.includes('샤이닝') || event.includes('샤타'));
 
-    // 12성까지의 누적 비용 L (12성 이전은 파괴가 없으므로 단순 합산)
+    // 12성부터 현재 성수까지의 누적 비용 L (12성 이전은 파괴 없음)
     let cumulativeCost12ToCurrent = 0;
+    let cumulativeDestroys = 0;
+    let cumulativeTrials = 0;
 
     // 12 ~ 14성 구간
     for (let s = 12; s < 15; s++) {
       const pSuccess = STARFORCE_CONFIG.probTable[s][0];
-      const stepCost = discountedCosts[s];
-      // 12~14성은 파괴 0%
-      const expStepCost = stepCost / pSuccess;
-      cumulativeCost12ToCurrent += expStepCost;
+      const stepCost = discountedCosts[s] / pSuccess;
+      cumulativeCost12ToCurrent += stepCost;
+      cumulativeTrials += 1 / pSuccess;
     }
 
     const optimalSafeguard = []; // 파괴방지 권장 성수 목록 [15, 16, 17]
@@ -61,56 +59,54 @@ export class StarforceOptimizer {
     // 15 ~ 17성 구간 (파괴방지 vs 확정복구 vs 12성 롤백 3자 비교)
     for (let s = 15; s <= 17; s++) {
       const baseProb = STARFORCE_CONFIG.probTable[s];
-      let rawSuccess = baseProb[0];
-      let rawDestroy = isDestroyReduction ? baseProb[2] * 0.7 : baseProb[2];
+      const rawSuccess = baseProb[0];
+      const rawDestroy = isDestroyReduction ? baseProb[2] * 0.7 : baseProb[2];
 
       const normalCost = discountedCosts[s];
       const safeguardCost = normalCost + defaultCosts[s] * 2;
 
-      // 1) 파괴방지 사용 시 1단계 도달 기댓값
-      // 파괴율 = 0, 성공률 = rawSuccess
+      // 1) 파괴방지 사용 시
       const costSafe = safeguardCost / rawSuccess;
 
-      // 2) 파괴방지 미사용 + 확정 복구 시 1단계 도달 기댓값
+      // 2) 확정 복구 사용 시 (직전 성수 복구)
       const restoreInfo = getRestoreTotalCost({ level, star: s, spareCost: basePrice, event });
-      const restoreValue = restoreInfo ? restoreInfo.totalCost : Infinity;
-      const costRestore = (rawDestroy * restoreValue + normalCost) / rawSuccess;
+      const restoreLoss = restoreInfo ? restoreInfo.totalCost : Infinity;
+      const costRestore = (normalCost + rawDestroy * restoreLoss) / rawSuccess;
 
-      // 3) 파괴방지 미사용 + 12성 롤백 복구 시 1단계 도달 기댓값
-      const rollbackValue = basePrice + cumulativeCost12ToCurrent;
-      const costRollback = (rawDestroy * rollbackValue + normalCost) / rawSuccess;
+      // 3) 12성 롤백 복구 사용 시
+      const rollbackLoss = basePrice + cumulativeCost12ToCurrent;
+      const costRollback = (normalCost + rawDestroy * rollbackLoss) / rawSuccess;
 
-      let chosenStrategy = 'restore';
-      let minCost = costRestore;
+      let chosenStrategy = 'rollback';
+      let minCost = costRollback;
+      let stepDestroys = rawDestroy / rawSuccess;
 
-      if (rawSuccess < 1.0) {
-        if (costSafe <= costRestore && costSafe <= costRollback) {
-          chosenStrategy = 'safeguard';
-          minCost = costSafe;
-          optimalSafeguard.push(s);
-        } else if (costRestore <= costSafe && costRestore <= costRollback) {
-          chosenStrategy = 'restore';
-          minCost = costRestore;
-          optimalRestore.push(s);
-        } else {
-          chosenStrategy = 'rollback';
-          minCost = costRollback;
-        }
-      } else {
-        minCost = normalCost;
+      if (costSafe <= costRestore && costSafe <= costRollback) {
+        chosenStrategy = 'safeguard';
+        minCost = costSafe;
+        stepDestroys = 0;
+        optimalSafeguard.push(s);
+      } else if (costRestore <= costRollback) {
+        chosenStrategy = 'restore';
+        minCost = costRestore;
+        optimalRestore.push(s);
       }
 
       cumulativeCost12ToCurrent += minCost;
+      cumulativeDestroys += stepDestroys;
+      cumulativeTrials += (1 + (chosenStrategy === 'safeguard' ? 0 : rawDestroy * (chosenStrategy === 'restore' ? 0 : cumulativeTrials))) / rawSuccess;
 
       stepDetails.push({
         star: s,
         strategy: chosenStrategy,
         minCost,
+        cumulativeCost: cumulativeCost12ToCurrent,
+        cumulativeDestroys,
         costSafe,
         costRestore,
         costRollback,
-        restoreValue,
-        rollbackValue
+        restoreValue: restoreLoss,
+        rollbackValue: rollbackLoss
       });
     }
 
@@ -122,35 +118,133 @@ export class StarforceOptimizer {
       const normalCost = discountedCosts[s];
 
       const restoreInfo = getRestoreTotalCost({ level, star: s, spareCost: basePrice, event });
-      const restoreValue = restoreInfo ? restoreInfo.totalCost : Infinity;
-      const rollbackValue = basePrice + cumulativeCost12ToCurrent;
+      const restoreLoss = restoreInfo ? restoreInfo.totalCost : Infinity;
+      const rollbackLoss = basePrice + cumulativeCost12ToCurrent;
 
-      const isRestoreBetter = restoreValue < rollbackValue;
-      const chosenLoss = isRestoreBetter ? restoreValue : rollbackValue;
-      const expStepCost = (normalCost + rawDestroy * chosenLoss) / rawSuccess;
+      const costRestore = (normalCost + rawDestroy * restoreLoss) / rawSuccess;
+      const costRollback = (normalCost + rawDestroy * rollbackLoss) / rawSuccess;
+
+      const isRestoreBetter = costRestore <= costRollback;
+      const minCost = isRestoreBetter ? costRestore : costRollback;
 
       if (isRestoreBetter) {
         optimalRestore.push(s);
       }
 
-      cumulativeCost12ToCurrent += expStepCost;
+      cumulativeCost12ToCurrent += minCost;
+      cumulativeDestroys += rawDestroy / rawSuccess;
+      cumulativeTrials += (1 + (isRestoreBetter ? 0 : rawDestroy * cumulativeTrials)) / rawSuccess;
 
       stepDetails.push({
         star: s,
         strategy: isRestoreBetter ? 'restore' : 'rollback',
-        minCost: expStepCost,
+        minCost,
+        cumulativeCost: cumulativeCost12ToCurrent,
+        cumulativeDestroys,
         costSafe: null,
-        costRestore: (normalCost + rawDestroy * restoreValue) / rawSuccess,
-        costRollback: (normalCost + rawDestroy * rollbackValue) / rawSuccess,
-        restoreValue,
-        rollbackValue
+        costRestore,
+        costRollback,
+        restoreValue: restoreLoss,
+        rollbackValue: rollbackLoss
       });
     }
 
     return {
       destroyPrevention: optimalSafeguard,
       restore: optimalRestore,
-      stepDetails
+      stepDetails,
+      cumulativeCost12ToCurrent
+    };
+  }
+
+  /**
+   * 시작 성수부터 목표 성수까지의 수학적 마르코프 정확 기댓값 계산
+   */
+  static getExactMarkovExpectation(item, event = null, mvpDiscount = 0, pcRoom = false) {
+    const opt = this.getOptimalReinforcement(item, event, mvpDiscount, pcRoom);
+    const { startStar = 0, targetStar = 22, level, baseCost } = item;
+    const defaultCosts = getCosts(level);
+
+    let discountRatio = mvpDiscount;
+    if (pcRoom) discountRatio += 0.05;
+    const isGlobalDiscount = event !== null && (event.includes('30%') || event.includes('샤이닝') || event.includes('샤타'));
+    const discountedCosts = defaultCosts.map((cost, index) => {
+      let c = index < 17 ? cost * (1 - discountRatio) : cost;
+      if (isGlobalDiscount) c *= 0.7;
+      return Math.round(c);
+    });
+
+    const isDestroyReduction = event !== null && (event.includes('파괴') || event.includes('샤이닝') || event.includes('샤타'));
+
+    // 0~startStar까지의 누적 비용
+    let totalCost = 0;
+    let totalDestroys = 0;
+    let totalTrials = 0;
+
+    // 0 ~ 11성
+    for (let s = 0; s < Math.min(startStar, 12); s++) {
+      // 0~11성은 파괴 없음
+    }
+
+    // 0~11성에서 목표성수로 갈 때
+    for (let s = startStar; s < Math.min(targetStar, 12); s++) {
+      const pSuccess = STARFORCE_CONFIG.probTable[s][0];
+      totalCost += discountedCosts[s] / pSuccess;
+      totalTrials += 1 / pSuccess;
+    }
+
+    // 12성부터 22성까지의 단계별 비용 합산
+    let cum12 = 0;
+    for (let s = 12; s < 15; s++) {
+      const pSuccess = STARFORCE_CONFIG.probTable[s][0];
+      const stepCost = discountedCosts[s] / pSuccess;
+      cum12 += stepCost;
+      if (s >= startStar && s < targetStar) {
+        totalCost += stepCost;
+        totalTrials += 1 / pSuccess;
+      }
+    }
+
+    for (let s = 15; s < targetStar; s++) {
+      const baseProb = STARFORCE_CONFIG.probTable[s];
+      const rawSuccess = baseProb[0];
+      const rawDestroy = (isDestroyReduction && s <= 21) ? baseProb[2] * 0.7 : baseProb[2];
+      const normalCost = discountedCosts[s];
+
+      const isSafe = opt.destroyPrevention.includes(s);
+      const isRest = opt.restore.includes(s);
+
+      let stepCost = 0;
+      let stepDest = 0;
+
+      if (isSafe) {
+        stepCost = (normalCost + defaultCosts[s] * 2) / rawSuccess;
+        stepDest = 0;
+      } else if (isRest) {
+        const restoreInfo = getRestoreTotalCost({ level, star: s, spareCost: baseCost, event });
+        const restoreLoss = restoreInfo ? restoreInfo.totalCost : Infinity;
+        stepCost = (normalCost + rawDestroy * restoreLoss) / rawSuccess;
+        stepDest = rawDestroy / rawSuccess;
+      } else {
+        const rollbackLoss = baseCost + cum12;
+        stepCost = (normalCost + rawDestroy * rollbackLoss) / rawSuccess;
+        stepDest = rawDestroy / rawSuccess;
+      }
+
+      cum12 += stepCost;
+
+      if (s >= startStar) {
+        totalCost += stepCost;
+        totalDestroys += stepDest;
+        totalTrials += 1 / rawSuccess;
+      }
+    }
+
+    return {
+      expCost: totalCost,
+      expDestroys: totalDestroys,
+      expTrials: totalTrials,
+      optimal: opt
     };
   }
 }

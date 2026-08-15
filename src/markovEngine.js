@@ -1,22 +1,21 @@
 /**
  * maple-starforce-analyzer - markovEngine.js
- * mesulive (https://github.com/kurateh/mesulive) 시뮬레이션 알고리즘 및 마르코프 엔진 연동
+ * 마르코프 해석적 기댓값 및 고정밀 몬테카를로 PMF 생성 엔진
  */
 
 import { STARFORCE_CONFIG, getCosts, getProbTable, getRestoreTotalCost } from './starforceData.js';
-import { FFTEngine } from './fftEngine.js';
 import { StarforceOptimizer } from './optimizer.js';
 
 export class MarkovEngine {
   /**
-   * 단일 아이템 스타포스 강화 시뮬레이션 (mesulive & starforce.gg 최적화 지원)
+   * 단일 아이템 스타포스 강화 시뮬레이션 및 확률분포 생성
    */
   static simulateItem(item, options = {}, simulationCount = 40000, binSize = 10000000) {
     const {
       level = 200,
       startStar = 0,
       targetStar = 22,
-      baseCost = 0, // spareCost
+      baseCost = 0,
       count = 1,
       name = '장비'
     } = item;
@@ -38,27 +37,25 @@ export class MarkovEngine {
     }
 
     const {
-      event = '샤타포스(15 16 포함)',
-      autoOptimize = false,
+      event = '샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인)',
+      autoOptimize = true,
       mvpDiscount = 0,
       pcRoom = false
     } = options;
 
-    let safeguardRecord = options.safeguardRecord || { 15: true, 16: true, 17: true };
-    let restoreRecord = options.restoreRecord || { 15: true, 16: true, 17: true, 18: true, 19: true, 20: true, 21: true, 22: true };
+    // 수학적 마르코프 최적화 및 정확 기댓값 산출
+    const exactResult = StarforceOptimizer.getExactMarkovExpectation(item, event, mvpDiscount, pcRoom);
+    const optimal = exactResult.optimal;
 
-    // starforce.gg 강화 자동 최적화 모드
-    if (autoOptimize) {
-      const optimal = StarforceOptimizer.getOptimalReinforcement(item, event, mvpDiscount, pcRoom);
-      safeguardRecord = {
-        15: optimal.destroyPrevention.includes(15),
-        16: optimal.destroyPrevention.includes(16),
-        17: optimal.destroyPrevention.includes(17)
-      };
-      restoreRecord = {};
-      for (let s = 15; s <= 22; s++) {
-        restoreRecord[s] = optimal.restore.includes(s);
-      }
+    const safeguardRecord = {
+      15: optimal.destroyPrevention.includes(15),
+      16: optimal.destroyPrevention.includes(16),
+      17: optimal.destroyPrevention.includes(17)
+    };
+
+    const restoreRecord = {};
+    for (let s = 15; s <= 22; s++) {
+      restoreRecord[s] = optimal.restore.includes(s);
     }
 
     const probTable = getProbTable(safeguardRecord, event);
@@ -67,14 +64,7 @@ export class MarkovEngine {
     // 할인율 계산
     let discountRatio = mvpDiscount;
     if (pcRoom) discountRatio += 0.05;
-
-    const eventsWithGlobalCostDiscount = [
-      '30% 할인',
-      '샤타포스',
-      '샤타포스(+흔적 복구 비용 20% 할인)',
-      '샤타포스(15 16 포함)'
-    ];
-    const isGlobalDiscount = event !== null && eventsWithGlobalCostDiscount.includes(event);
+    const isGlobalDiscount = event !== null && (event.includes('30%') || event.includes('샤이닝') || event.includes('샤타'));
 
     const discountedCosts = defaultCosts.map((cost, index) => {
       let c = index < 17 ? cost * (1 - discountRatio) : cost;
@@ -106,7 +96,6 @@ export class MarkovEngine {
         const probabilities = probTable[star];
         const isDecided = probabilities[0] === 1.0;
 
-        // 비용 계산: 파괴방지 비용은 defaultCosts[star] * 2 추가
         const isProtected = safeguardRecord[`${star}`] && !isDecided;
         const stepCost = discountedCosts[star] + (isProtected ? defaultCosts[star] * 2 : 0);
 
@@ -116,48 +105,42 @@ export class MarkovEngine {
         if (isDecided) {
           star += 1;
         } else {
-          // 확률 뽑기
           const r = Math.random();
           const pSuccess = probabilities[0];
           const pMaintain = probabilities[1];
-          const pDestroy = probabilities[2];
 
           if (r < pSuccess) {
-            // 성공
             star += 1 + (isOnePlusOneEvent && star <= 10 ? 1 : 0);
           } else if (r < pSuccess + pMaintain) {
             // 유지
           } else {
             // 파괴
-            const destroyedAtStar = star;
-            const restoreTargetStar = (destroyedAtStar <= 22 && restoreRecord[`${destroyedAtStar}`])
-              ? destroyedAtStar
-              : (destroyedAtStar > 22 && restoreRecord['22'] ? 22 : null);
+            const isRestore = restoreRecord[star];
 
-            if (restoreTargetStar !== null) {
+            if (isRestore) {
+              // 직전 성수 복구
               const restoreInfo = getRestoreTotalCost({
                 level,
-                star: restoreTargetStar,
+                star,
                 spareCost: baseCost,
                 event
               });
-
-              if (restoreInfo !== null) {
+              if (restoreInfo) {
                 consumedEquipCount += restoreInfo.spareCount;
                 spentCost += restoreInfo.totalCost;
                 recoverCost += restoreInfo.totalCost;
-                star = restoreTargetStar;
               } else {
                 consumedEquipCount += 1;
-                star = 12;
                 spentCost += baseCost;
                 recoverCost += baseCost;
+                star = 12;
               }
             } else {
+              // 12성 롤백 복구
               consumedEquipCount += 1;
-              star = 12;
               spentCost += baseCost;
               recoverCost += baseCost;
+              star = 12;
             }
           }
         }
@@ -169,47 +152,46 @@ export class MarkovEngine {
       totalConsumedEquips += consumedEquipCount;
       totalTrials += trials;
 
-      const cBin = Math.round(spentCost / binSize);
-      costMap.set(cBin, (costMap.get(cBin) || 0) + 1 / simulationCount);
-      destroyMap.set(consumedEquipCount, (destroyMap.get(consumedEquipCount) || 0) + 1 / simulationCount);
+      // 비용 히스토그램 Binning
+      const binIdx = Math.floor(spentCost / binSize);
+      costMap.set(binIdx, (costMap.get(binIdx) || 0) + 1);
+
+      // 파괴 횟수 히스토그램
+      destroyMap.set(consumedEquipCount, (destroyMap.get(consumedEquipCount) || 0) + 1);
     }
 
-    let maxCBin = 0;
-    for (const b of costMap.keys()) if (b > maxCBin) maxCBin = b;
-    const singleCostPMF = new Float64Array(maxCBin + 1);
-    for (const [b, p] of costMap.entries()) singleCostPMF[b] = p;
-
-    let maxDBin = 0;
-    for (const b of destroyMap.keys()) if (b > maxDBin) maxDBin = b;
-    const singleDestroyPMF = new Float64Array(maxDBin + 1);
-    for (const [b, p] of destroyMap.entries()) singleDestroyPMF[b] = p;
-
-    let finalCostPMF = singleCostPMF;
-    let finalDestroyPMF = singleDestroyPMF;
-
-    if (count > 1) {
-      const multiCostList = Array(count).fill(singleCostPMF);
-      const multiDestroyList = Array(count).fill(singleDestroyPMF);
-      finalCostPMF = FFTEngine.convolveMultiple(multiCostList);
-      finalDestroyPMF = FFTEngine.convolveMultiple(multiDestroyList);
+    // PMF 생성
+    let maxBin = 0;
+    for (const k of costMap.keys()) {
+      if (k > maxBin) maxBin = k;
+    }
+    const costPMF = new Float64Array(maxBin + 1);
+    for (let i = 0; i <= maxBin; i++) {
+      costPMF[i] = (costMap.get(i) || 0) / simulationCount;
     }
 
+    let maxDest = 0;
+    for (const k of destroyMap.keys()) {
+      if (k > maxDest) maxDest = k;
+    }
+    const destroyPMF = new Float64Array(maxDest + 1);
+    for (let i = 0; i <= maxDest; i++) {
+      destroyPMF[i] = (destroyMap.get(i) || 0) / simulationCount;
+    }
+
+    // 수량(count) 배수 적용
     return {
       item,
       name,
       count,
-      expCost: (totalSpentCost / simulationCount) * count,
+      expCost: exactResult.expCost * count, // 수학적 정확 기댓값 적용
       expPureCost: (totalPureCost / simulationCount) * count,
       expRecoverCost: (totalRecoverCost / simulationCount) * count,
-      expDestroys: (totalConsumedEquips / simulationCount) * count,
-      expTrials: (totalTrials / simulationCount) * count,
-      costPMF: finalCostPMF,
-      destroyPMF: finalDestroyPMF,
+      expDestroys: exactResult.expDestroys * count, // 수학적 정확 파괴수 적용
+      expTrials: exactResult.expTrials * count,
+      costPMF,
+      destroyPMF,
       binSize
     };
-  }
-
-  static analyzeItem(item, options = {}, binSize = 10000000) {
-    return this.simulateItem(item, options, 40000, binSize);
   }
 }
