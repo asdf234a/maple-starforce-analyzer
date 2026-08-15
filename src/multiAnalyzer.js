@@ -48,7 +48,7 @@ export class MultiAnalyzer {
     }
 
     // 개별 아이템 분석
-    const itemResults = items.map(item => MarkovEngine.analyzeItem(item, options, binSize));
+    const itemResults = items.map(item => MarkovEngine.simulateItem(item, options, 40000, binSize));
 
     // 전체 아이템 FFT 합성곱
     const allCostPMFs = itemResults.map(r => r.costPMF);

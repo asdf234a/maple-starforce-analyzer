@@ -2252,6 +2252,10 @@ class StarforceOptimizer {
 
 
 class MarkovEngine {
+  static analyzeItem(item, options = {}, binSize = 10000000) {
+    return this.simulateItem(item, options, 40000, binSize);
+  }
+
   /**
    * 단일 아이템 스타포스 강화 시뮬레이션 및 확률분포 생성
    */
@@ -2492,7 +2496,7 @@ class MultiAnalyzer {
     }
 
     // 개별 아이템 분석
-    const itemResults = items.map(item => MarkovEngine.analyzeItem(item, options, binSize));
+    const itemResults = items.map(item => MarkovEngine.simulateItem(item, options, 40000, binSize));
 
     // 전체 아이템 FFT 합성곱
     const allCostPMFs = itemResults.map(r => r.costPMF);

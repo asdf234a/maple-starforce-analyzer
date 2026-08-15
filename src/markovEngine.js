@@ -7,6 +7,10 @@ import { STARFORCE_CONFIG, getCosts, getProbTable, getRestoreTotalCost } from '.
 import { StarforceOptimizer } from './optimizer.js';
 
 export class MarkovEngine {
+  static analyzeItem(item, options = {}, binSize = 10000000) {
+    return this.simulateItem(item, options, 40000, binSize);
+  }
+
   /**
    * 단일 아이템 스타포스 강화 시뮬레이션 및 확률분포 생성
    */
