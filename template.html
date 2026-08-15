@@ -187,12 +187,16 @@
           </div>
 
           <!-- 4. 추천 예산 범위 (상위 10% ~ 90%) -->
-          <div class="kpi-card">
+          <div class="kpi-card budget-range-card">
             <div class="kpi-icon lucky-card-icon"><i class="fa-solid fa-arrows-left-right-to-line"></i></div>
             <div class="kpi-content">
               <div class="kpi-label">상위 10% ~ 90% 예산 범위</div>
-              <div class="kpi-value range-value" id="kpiBudgetSpan">-</div>
-              <div class="kpi-sub">상위 10%: <span id="kpiTop10Cost">-</span> / 상위 90%: <span id="kpiBottom10Cost">-</span></div>
+              <div class="budget-range-row">
+                <span class="range-pill top10"><small>10%</small> <b id="kpiTop10Cost">-</b></span>
+                <span class="range-arrow">~</span>
+                <span class="range-pill bot10"><small>90%</small> <b id="kpiBottom10Cost">-</b></span>
+              </div>
+              <div class="kpi-sub">80% 확률로 이 예산 구간 내 완성</div>
             </div>
           </div>
 
