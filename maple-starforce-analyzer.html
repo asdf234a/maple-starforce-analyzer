@@ -2528,9 +2528,17 @@ class MultiAnalyzer {
     // 개별 아이템 분석
     const itemResults = items.map(item => MarkovEngine.simulateItem(item, options, 40000, binSize));
 
-    // 전체 아이템 FFT 합성곱
-    const allCostPMFs = itemResults.map(r => r.costPMF);
-    const allDestroyPMFs = itemResults.map(r => r.destroyPMF);
+    // 전체 아이템 FFT 합성곱 (수량 count 배수만큼 정확히 합성곱 수행)
+    const allCostPMFs = [];
+    const allDestroyPMFs = [];
+
+    itemResults.forEach(r => {
+      const cnt = Math.max(1, parseInt(r.count) || 1);
+      for (let c = 0; c < cnt; c++) {
+        allCostPMFs.push(r.costPMF);
+        allDestroyPMFs.push(r.destroyPMF);
+      }
+    });
 
     const totalCostPMF = FFTEngine.convolveMultiple(allCostPMFs);
     const totalDestroyPMF = FFTEngine.convolveMultiple(allDestroyPMFs);
