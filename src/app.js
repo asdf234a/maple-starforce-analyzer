@@ -691,15 +691,53 @@ function initEvents() {
     }
   });
 
-  document.getElementById('btnAddCustomItem').addEventListener('click', () => openItemModal(-1));
-  document.getElementById('btnCloseModal').addEventListener('click', closeItemModal);
-  document.getElementById('btnCancelModal').addEventListener('click', closeItemModal);
+  // 전역 클릭 위임 핸들러 (모달 열기, 닫기, MVP 변경 등 완벽 보장)
+  document.addEventListener('click', (e) => {
+    // 장비 추가 버튼 클릭
+    if (e.target.closest('#btnAddCustomItem') || e.target.closest('#btnEmptyAdd')) {
+      e.preventDefault();
+      openItemModal(-1);
+    }
+    // 모달 닫기 버튼 클릭
+    if (e.target.closest('#btnCloseModal') || e.target.closest('#btnCancelModal')) {
+      e.preventDefault();
+      closeItemModal();
+    }
+    // MVP 버튼 클릭
+    const mvpBtn = e.target.closest('#mvpButtonGroup .pill-btn');
+    if (mvpBtn) {
+      e.preventDefault();
+      document.querySelectorAll('#mvpButtonGroup .pill-btn').forEach(b => b.classList.remove('active'));
+      mvpBtn.classList.add('active');
+      state.options.mvpDiscount = parseFloat(mvpBtn.dataset.value) || 0;
+      runAnalysis();
+    }
+  });
+
+  const btnAddCustom = document.getElementById('btnAddCustomItem');
+  if (btnAddCustom) {
+    btnAddCustom.addEventListener('click', () => openItemModal(-1));
+  }
+
+  const btnClose = document.getElementById('btnCloseModal');
+  if (btnClose) {
+    btnClose.addEventListener('click', closeItemModal);
+  }
+
+  const btnCancel = document.getElementById('btnCancelModal');
+  if (btnCancel) {
+    btnCancel.addEventListener('click', closeItemModal);
+  }
 
   // 노작 비용 실시간 포맷 표시 (만 메소 단위 입력 -> 한글 포맷팅)
-  document.getElementById('inputBaseCost').addEventListener('input', (e) => {
-    const manVal = parseFloat(e.target.value) || 0;
-    document.getElementById('baseCostFormatted').innerText = formatManMeso(manVal);
-  });
+  const inputBase = document.getElementById('inputBaseCost');
+  if (inputBase) {
+    inputBase.addEventListener('input', (e) => {
+      const manVal = parseFloat(e.target.value) || 0;
+      const fmtElem = document.getElementById('baseCostFormatted');
+      if (fmtElem) fmtElem.innerText = formatManMeso(manVal);
+    });
+  }
 
   function saveItemFromModal() {
     const nameVal = document.getElementById('inputItemName').value.trim() || '장비';
