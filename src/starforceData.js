@@ -7,11 +7,11 @@ export const STARFORCE_CONFIG = {
   maxStar: 30,
 
   itemPresets: [
-    { id: 'eternal', name: '에테르넬 (250제)', level: 250, defaultBaseCost: 8000000000 },
+    { id: 'eternal', name: '에테르넬 (250제)', level: 250, defaultBaseCost: 1500000000 },
+    { id: 'whisper_250', name: '근원의 속삭임 (250제)', level: 250, defaultBaseCost: 600000000 },
+    { id: 'dark_boss_200', name: '칠흑 200제 (몽벨/거공/마안/커포 등)', level: 200, defaultBaseCost: 1000000000 },
+    { id: 'dark_boss_160', name: '칠흑 160제 (루컨마/마깃안 등)', level: 160, defaultBaseCost: 1500000000 },
     { id: 'arcane', name: '아케인셰이드 (200제)', level: 200, defaultBaseCost: 150000000 },
-    { id: 'abso', name: '앱솔랩스 (160제)', level: 160, defaultBaseCost: 15000000 },
-    { id: 'dark_boss_200', name: '칠흑의 보스 (200제 - 거공/근원/마깃안 등)', level: 200, defaultBaseCost: 4000000000 },
-    { id: 'dark_boss_160', name: '칠흑의 보스 (160제 - 루컨마/마깃안/커포링 등)', level: 160, defaultBaseCost: 2500000000 },
     { id: 'dawn_160', name: '여명의 보스 (160제 - 트왈마/에스텔라/데브 등)', level: 160, defaultBaseCost: 80000000 },
     { id: 'cra_150', name: '루타비스/카루타 (150제)', level: 150, defaultBaseCost: 5000000 }
   ],

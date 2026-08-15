@@ -2,7 +2,7 @@
  * maple-starforce-analyzer - optimizer.js
  * 동적계획법(DP / Bellman Equation) 기반 강화 최적화 엔진
  * 
- * 12성 롤백 손실 = (baseCost + 12->s성 누적 기댓값)
+ * 12성 롤백 손실 = (baseCost + 12->s성 순수 강화 기댓값)
  * 확정 복구 손실 = (spareCount * baseCost + 할인된 복구 메소)
  * 파괴방지 비용 = 2 * 노할인 기본비용
  * 
@@ -39,7 +39,7 @@ export class StarforceOptimizer {
 
     const isDestroyReduction = event !== null && (event.includes('파괴') || event.includes('샤이닝') || event.includes('샤타'));
 
-    // 12성부터 현재 성수까지의 누적 비용 L (12성 이전은 파괴 없음)
+    // 12성부터 현재 성수까지의 순수 누적 비용 L (12성 이전은 파괴 없음)
     let cumulativeCost12ToCurrent = 0;
     let cumulativeDestroys = 0;
     let cumulativeTrials = 0;
@@ -124,7 +124,8 @@ export class StarforceOptimizer {
       const costRestore = (normalCost + rawDestroy * restoreLoss) / rawSuccess;
       const costRollback = (normalCost + rawDestroy * rollbackLoss) / rawSuccess;
 
-      const isRestoreBetter = costRestore <= costRollback;
+      // 18성 이상에서는 복구 손실이 롤백 손실보다 확실히 저렴할 때만 채택 (동일 수준 시 롤백 권장)
+      const isRestoreBetter = (restoreLoss < rollbackLoss);
       const minCost = isRestoreBetter ? costRestore : costRollback;
 
       if (isRestoreBetter) {
@@ -176,15 +177,9 @@ export class StarforceOptimizer {
 
     const isDestroyReduction = event !== null && (event.includes('파괴') || event.includes('샤이닝') || event.includes('샤타'));
 
-    // 0~startStar까지의 누적 비용
     let totalCost = 0;
     let totalDestroys = 0;
     let totalTrials = 0;
-
-    // 0 ~ 11성
-    for (let s = 0; s < Math.min(startStar, 12); s++) {
-      // 0~11성은 파괴 없음
-    }
 
     // 0~11성에서 목표성수로 갈 때
     for (let s = startStar; s < Math.min(targetStar, 12); s++) {
