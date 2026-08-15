@@ -11,7 +11,7 @@ import { StarforceOptimizer } from './optimizer.js';
 const state = {
   items: [],
   options: {
-    event: '샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인 + 5/10/15성 100%)',
+    event: '샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인)',
     autoOptimize: true,
     safeguard: { 15: true, 16: true, 17: true },
     restoreMode: 'optimal', // 'optimal' (성수별 최대 효율 복구) | 'exact' | 'rollback12'

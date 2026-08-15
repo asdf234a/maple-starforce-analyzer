@@ -40,21 +40,14 @@ export class StarforceOptimizer {
       return Math.round(c);
     });
 
-    const isShataWith1516 = event === '5/10/15성 100%' || event === '샤타포스(15 16 포함)';
-    const eventsWithDestroyReduction = [
-      '21성 이하 파괴 확률 30% 감소',
-      '샤타포스',
-      '샤타포스(+흔적 복구 비용 20% 할인)',
-      '샤타포스(15 16 포함)'
-    ];
-    const isDestroyReduction = event !== null && eventsWithDestroyReduction.includes(event);
+    const isDestroyReduction = event !== null && (event.includes('파괴') || event.includes('샤이닝'));
 
     // 12성까지의 누적 비용 L (12성 이전은 파괴가 없으므로 단순 합산)
     let cumulativeCost12ToCurrent = 0;
 
     // 12 ~ 14성 구간
     for (let s = 12; s < 15; s++) {
-      const pSuccess = (isShataWith1516 && s === 15) ? 1.0 : (s === 12 ? 0.42 : (s === 13 ? 0.3675 : 0.315));
+      const pSuccess = STARFORCE_CONFIG.probTable[s][0];
       const stepCost = discountedCosts[s];
       // 12~14성은 파괴 0%
       const expStepCost = stepCost / pSuccess;
@@ -70,26 +63,22 @@ export class StarforceOptimizer {
       const baseProb = STARFORCE_CONFIG.probTable[s];
       let rawSuccess = baseProb[0];
       let rawDestroy = isDestroyReduction ? baseProb[2] * 0.7 : baseProb[2];
-      if (isShataWith1516 && s === 15) {
-        rawSuccess = 1.0;
-        rawDestroy = 0.0;
-      }
 
       const normalCost = discountedCosts[s];
       const safeguardCost = normalCost + defaultCosts[s] * 2;
 
       // 1) 파괴방지 사용 시 1단계 도달 기댓값
       // 파괴율 = 0, 성공률 = rawSuccess
-      const costSafe = rawSuccess === 1.0 ? normalCost : (safeguardCost / rawSuccess);
+      const costSafe = safeguardCost / rawSuccess;
 
       // 2) 파괴방지 미사용 + 확정 복구 시 1단계 도달 기댓값
       const restoreInfo = getRestoreTotalCost({ level, star: s, spareCost: basePrice, event });
       const restoreValue = restoreInfo ? restoreInfo.totalCost : Infinity;
-      const costRestore = rawSuccess === 1.0 ? normalCost : ((rawDestroy * restoreValue + normalCost) / rawSuccess);
+      const costRestore = (rawDestroy * restoreValue + normalCost) / rawSuccess;
 
       // 3) 파괴방지 미사용 + 12성 롤백 복구 시 1단계 도달 기댓값
       const rollbackValue = basePrice + cumulativeCost12ToCurrent;
-      const costRollback = rawSuccess === 1.0 ? normalCost : ((rawDestroy * rollbackValue + normalCost) / rawSuccess);
+      const costRollback = (rawDestroy * rollbackValue + normalCost) / rawSuccess;
 
       let chosenStrategy = 'restore';
       let minCost = costRestore;

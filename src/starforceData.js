@@ -112,28 +112,14 @@ export function getProbTable(safeguardRecord = {}, event = null) {
   const table = JSON.parse(JSON.stringify(STARFORCE_CONFIG.probTable));
 
   // 파괴확률 30% 감소 이벤트
-  const eventsWithDestroyReduction = [
-    '샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 30% 감소 + 흔적 복구 메소 20% 할인 + 5/10/15성 100%)',
-    '샤타포스',
-    '샤타포스(+흔적 복구 비용 20% 할인)',
-    '샤타포스(15 16 포함)'
-  ];
+  const isDestroyReduction = event !== null && (event.includes('파괴') || event.includes('샤이닝'));
 
-  if (event !== null && eventsWithDestroyReduction.some(e => event.includes('샤이닝') || event === e)) {
+  if (isDestroyReduction) {
     for (let i = 0; i < 22; i++) {
       const destroyProb = table[i][2];
       table[i][2] = destroyProb * 0.7;
       table[i][1] += destroyProb * 0.3;
     }
-  }
-
-  // 5/10/15성 100% 이벤트
-  if (event !== null && (event.includes('100%') || event.includes('샤이닝') || event.includes('15 16'))) {
-    [5, 10, 15].forEach(i => {
-      table[i][0] = 1.0;
-      table[i][1] = 0.0;
-      table[i][2] = 0.0;
-    });
   }
 
   // 파괴 방지 적용
