@@ -117,7 +117,7 @@
               <button type="button" id="btnClearItems" class="btn-text-danger" title="목록 비우기">
                 <i class="fa-solid fa-trash-can"></i> 전체 비우기
               </button>
-              <button type="button" id="btnAddCustomItem" class="btn-primary-sm">
+              <button type="button" id="btnAddCustomItem" class="btn-primary-sm" onclick="window.openItemModal(-1)">
                 <i class="fa-solid fa-plus"></i> 장비 추가
               </button>
             </div>
@@ -304,7 +304,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h3 id="modalTitle">강화 대상 장비 추가</h3>
-        <button type="button" class="btn-close-modal" id="btnCloseModal"><i class="fa-solid fa-xmark"></i></button>
+        <button type="button" class="btn-close-modal" id="btnCloseModal" onclick="window.closeItemModal()"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <form id="itemForm" class="modal-body">
         <input type="hidden" id="editItemId" value="">
@@ -354,7 +354,7 @@
         </div>
 
         <div class="modal-footer">
-          <button type="button" class="btn-secondary" id="btnCancelModal">취소</button>
+          <button type="button" class="btn-secondary" id="btnCancelModal" onclick="window.closeItemModal()">취소</button>
           <button type="submit" class="btn-primary" id="btnSaveItem">저장 및 적용</button>
         </div>
       </form>

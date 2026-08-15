@@ -882,13 +882,19 @@ function initEvents() {
       link.href = URL.createObjectURL(blob);
       link.download = `스타포스_강화분석_${new Date().toISOString().slice(0, 10)}.json`;
       link.click();
-    });
-  }
-}
+// 전역 헬퍼 노출 (인라인 및 외부 호출 완벽 지원)
+window.openItemModal = openItemModal;
+window.closeItemModal = closeItemModal;
 
 // 초기화
-window.addEventListener('DOMContentLoaded', () => {
+function bootstrap() {
   renderCustomPresetChips();
   initEvents();
   runAnalysis();
-});
+}
+
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', bootstrap);
+} else {
+  bootstrap();
+}
