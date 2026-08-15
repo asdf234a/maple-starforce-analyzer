@@ -113,13 +113,13 @@ export function getProbTable(safeguardRecord = {}, event = null) {
 
   // 파괴확률 30% 감소 이벤트
   const eventsWithDestroyReduction = [
-    '21성 이하 파괴 확률 30% 감소',
+    '샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 30% 감소 + 흔적 복구 메소 20% 할인 + 5/10/15성 100%)',
     '샤타포스',
     '샤타포스(+흔적 복구 비용 20% 할인)',
     '샤타포스(15 16 포함)'
   ];
 
-  if (event !== null && eventsWithDestroyReduction.includes(event)) {
+  if (event !== null && eventsWithDestroyReduction.some(e => event.includes('샤이닝') || event === e)) {
     for (let i = 0; i < 22; i++) {
       const destroyProb = table[i][2];
       table[i][2] = destroyProb * 0.7;
@@ -128,12 +128,7 @@ export function getProbTable(safeguardRecord = {}, event = null) {
   }
 
   // 5/10/15성 100% 이벤트
-  const eventsWithGuaranteedSuccess = [
-    '5/10/15성 100%',
-    '샤타포스(15 16 포함)'
-  ];
-
-  if (event !== null && eventsWithGuaranteedSuccess.includes(event)) {
+  if (event !== null && (event.includes('100%') || event.includes('샤이닝') || event.includes('15 16'))) {
     [5, 10, 15].forEach(i => {
       table[i][0] = 1.0;
       table[i][1] = 0.0;
@@ -165,12 +160,9 @@ export function getRestoreTotalCost({ level, star, spareCost, event = null }) {
   if (requiredSpareCount <= 0 || restoreCostInHundredMillions <= 0) return null;
 
   const restoreCostMeso = Math.round(restoreCostInHundredMillions * HUNDRED_MILLION);
-  const eventsWithRestoreMesoDiscount = [
-    '흔적 복구 비용 20% 할인',
-    '샤타포스(+흔적 복구 비용 20% 할인)'
-  ];
+  const hasRestoreDiscount = event !== null && (event.includes('흔적 복구') || event.includes('샤이닝'));
 
-  const discountRatio = (event !== null && eventsWithRestoreMesoDiscount.includes(event)) ? 0.2 : 0;
+  const discountRatio = hasRestoreDiscount ? 0.2 : 0;
   const discountedRestoreCostMeso = Math.round(restoreCostMeso * (1 - discountRatio));
 
   return {

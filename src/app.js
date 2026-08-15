@@ -1,55 +1,20 @@
 /**
  * maple-starforce-analyzer - app.js
- * 메인 애플리케이션 컨트롤러 및 UI/차트 렌더러
+ * 메이플 스타포스 다중 강화 비용 & 파괴 분포 분석기 메인 컨트롤러
  */
 
 import { STARFORCE_CONFIG } from './starforceData.js';
 import { MultiAnalyzer } from './multiAnalyzer.js';
 import { StarforceOptimizer } from './optimizer.js';
 
-// 기본 프리셋 데이터
-const PRESET_SETS = {
-  eternal4: [
-    { id: 'et_hat', name: '에테르넬 모자', level: 250, startStar: 0, targetStar: 22, baseCost: 8000000000, count: 1 },
-    { id: 'et_top', name: '에테르넬 상의', level: 250, startStar: 0, targetStar: 22, baseCost: 8000000000, count: 1 },
-    { id: 'et_bot', name: '에테르넬 하의', level: 250, startStar: 0, targetStar: 22, baseCost: 8000000000, count: 1 },
-    { id: 'et_sh', name: '에테르넬 견장', level: 250, startStar: 0, targetStar: 22, baseCost: 8000000000, count: 1 }
-  ],
-  darkboss5: [
-    { id: 'db_gong', name: '거대한 공포 (200제)', level: 200, startStar: 0, targetStar: 22, baseCost: 4000000000, count: 1 },
-    { id: 'db_root', name: '근원의 속삭임 (200제)', level: 200, startStar: 0, targetStar: 22, baseCost: 4500000000, count: 1 },
-    { id: 'db_eye', name: '마력이 깃든 안대 (160제)', level: 160, startStar: 0, targetStar: 22, baseCost: 2500000000, count: 1 },
-    { id: 'db_mark', name: '루즈 컨트롤 마크 (160제)', level: 160, startStar: 0, targetStar: 22, baseCost: 2500000000, count: 1 },
-    { id: 'db_ring', name: '커맨더 포스 링 (160제)', level: 160, startStar: 0, targetStar: 22, baseCost: 2200000000, count: 1 }
-  ],
-  arcane5: [
-    { id: 'ar_wp', name: '아케인셰이드 무기', level: 200, startStar: 0, targetStar: 22, baseCost: 200000000, count: 1 },
-    { id: 'ar_hat', name: '아케인셰이드 모자', level: 200, startStar: 0, targetStar: 22, baseCost: 150000000, count: 1 },
-    { id: 'ar_suit', name: '아케인셰이드 한벌옷', level: 200, startStar: 0, targetStar: 22, baseCost: 150000000, count: 1 },
-    { id: 'ar_glove', name: '아케인셰이드 장갑', level: 200, startStar: 0, targetStar: 22, baseCost: 150000000, count: 1 },
-    { id: 'ar_shoes', name: '아케인셰이드 신발', level: 200, startStar: 0, targetStar: 22, baseCost: 150000000, count: 1 }
-  ],
-  dawn4: [
-    { id: 'dw_face', name: '트와일라이트 마크', level: 160, startStar: 0, targetStar: 22, baseCost: 80000000, count: 1 },
-    { id: 'dw_ring', name: '에스텔라 이어링', level: 160, startStar: 0, targetStar: 22, baseCost: 80000000, count: 1 },
-    { id: 'dw_pend', name: '데이브레이크 펜던트', level: 160, startStar: 0, targetStar: 22, baseCost: 100000000, count: 1 },
-    { id: 'dw_garn', name: '가디언 엔젤 링', level: 160, startStar: 0, targetStar: 22, baseCost: 90000000, count: 1 }
-  ],
-  cra3: [
-    { id: 'cra_hat', name: '하이네스 (모자)', level: 150, startStar: 0, targetStar: 22, baseCost: 5000000, count: 1 },
-    { id: 'cra_top', name: '이글아이 (상의)', level: 150, startStar: 0, targetStar: 22, baseCost: 5000000, count: 1 },
-    { id: 'cra_bot', name: '트릭스터 (하의)', level: 150, startStar: 0, targetStar: 22, baseCost: 5000000, count: 1 }
-  ]
-};
-
-// 애플리케이션 상태
+// 애플리케이션 상태 (기본 목록: 빈 목록으로 시작)
 const state = {
-  items: JSON.parse(JSON.stringify(PRESET_SETS.darkboss5)), // 기본값: 칠흑 5부위
+  items: [],
   options: {
-    event: '샤타포스(15 16 포함)',
-    autoOptimize: true, // starforce.gg 강화 최적화 모드
+    event: '샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인 + 5/10/15성 100%)',
+    autoOptimize: true,
     safeguard: { 15: true, 16: true, 17: true },
-    restoreMode: 'exact',
+    restoreMode: 'optimal', // 'optimal' (성수별 최대 효율 복구) | 'exact' | 'rollback12'
     mvpDiscount: 0,
     pcRoom: false
   },
@@ -57,55 +22,71 @@ const state = {
   destroyChart: null
 };
 
+// 로컬 스토리지 키
+const STORAGE_KEY_PRESETS = 'maple_sf_custom_presets_v2';
+
 /**
- * 메소 단위를 '조', '억', '만'으로 포맷팅 (소수점 3자리 정밀 표기)
+ * 메소 단위를 '~억 ~만 메소'로 포맷팅
+ * @param {number} amount - 순수 메소 금액
+ * @param {boolean} includeWon - 원화 환산 병기 여부
  */
-function formatMeso(amount, precision = 3) {
-  if (!amount || isNaN(amount) || amount === 0) return '0.000 메소';
-  const val = Number(amount);
+export function formatMeso(amount) {
+  if (!amount || isNaN(amount) || amount === 0) return '0 메소';
+  const val = Math.round(Number(amount));
+  
   const jo = Math.floor(val / 1000000000000);
-  const eok = (val % 1000000000000) / 100000000;
+  const eok = Math.floor((val % 1000000000000) / 100000000);
+  const man = Math.floor((val % 100000000) / 10000);
+  const remainder = val % 10000;
 
-  if (jo > 0) {
-    const totalJo = val / 1000000000000;
-    return `${totalJo.toFixed(precision)}조 메소`;
-  } else if (val >= 100000000) {
-    const totalEok = val / 100000000;
-    return `${totalEok.toFixed(precision)}억 메소`;
-  } else if (val >= 10000) {
-    const totalMan = val / 10000;
-    return `${totalMan.toFixed(precision)}만 메소`;
-  }
-  return `${val.toLocaleString()} 메소`;
+  const parts = [];
+  if (jo > 0) parts.push(`${jo}조`);
+  if (eok > 0) parts.push(`${eok}억`);
+  if (man > 0) parts.push(`${man.toLocaleString()}만`);
+  if (parts.length === 0 && remainder > 0) parts.push(`${remainder.toLocaleString()}`);
+
+  if (parts.length === 0) return '0 메소';
+  return `${parts.join(' ')} 메소`;
 }
 
 /**
- * 단순 억 단위 소수점 3자리 포맷팅
+ * 만 메소 단위 입력값(예: 32 -> 320,000 메소)을 한글로 포맷팅
+ * @param {number} manVal - 만 메소 단위의 수치
  */
-function formatEok(amount) {
-  return `${(amount / 100000000).toFixed(3)}억`;
+export function formatManMeso(manVal) {
+  if (!manVal || isNaN(manVal) || manVal <= 0) return '0 메소';
+  const valInMeso = Number(manVal) * 10000;
+  return formatMeso(valInMeso);
 }
 
 /**
- * 전역 옵션 객체 가공 (mesulive & starforce.gg 최적화 연동)
+ * 전역 옵션 객체 가공 (성수별 독립 복구 최적화 지원)
  */
 function getCalculatedOptions() {
   const ev = state.options.event === 'none' ? null : state.options.event;
-  const isExact = state.options.restoreMode === 'exact';
   const isAuto = state.options.autoOptimize;
+  const restoreMode = state.options.restoreMode;
   const mvp = parseFloat(state.options.mvpDiscount);
   const pc = state.options.pcRoom;
 
   return {
     event: ev,
     autoOptimize: isAuto,
+    restoreMode: restoreMode,
     safeguardRecord: {
       15: !!state.options.safeguard[15],
       16: !!state.options.safeguard[16],
       17: !!state.options.safeguard[17]
     },
     restoreRecord: {
-      15: isExact, 16: isExact, 17: isExact, 18: isExact, 19: isExact, 20: isExact, 21: isExact, 22: isExact
+      15: restoreMode === 'exact' || restoreMode === 'optimal',
+      16: restoreMode === 'exact' || restoreMode === 'optimal',
+      17: restoreMode === 'exact' || restoreMode === 'optimal',
+      18: restoreMode === 'exact' || restoreMode === 'optimal',
+      19: restoreMode === 'exact' || restoreMode === 'optimal',
+      20: restoreMode === 'exact' || restoreMode === 'optimal',
+      21: restoreMode === 'exact' || restoreMode === 'optimal',
+      22: restoreMode === 'exact' || restoreMode === 'optimal'
     },
     mvpDiscount: mvp,
     pcRoom: pc
@@ -127,7 +108,7 @@ function runAnalysis() {
 }
 
 /**
- * KPI 카드 갱신 (소수점 3자리 정밀 표기)
+ * KPI 카드 갱신
  */
 function renderKpis(result) {
   if (!result || !result.items || result.items.length === 0) {
@@ -135,22 +116,26 @@ function renderKpis(result) {
     document.getElementById('kpiMedianCost').innerText = '-';
     document.getElementById('kpiTop10Cost').innerText = '-';
     document.getElementById('kpiBottom10Cost').innerText = '-';
+    document.getElementById('kpiSmithCost').innerText = '-';
+    document.getElementById('kpiSmithDesc').innerText = '직작 승률: -%';
     document.getElementById('kpiTotalDestroys').innerText = '-';
+    document.getElementById('kpiZeroDestroyProb').innerText = '노파괴(0개) 확률: -%';
     document.getElementById('kpiCalcTime').innerText = '0.00 ms';
+    document.getElementById('kpiPureAndBase').innerText = '순수강화: - | 복구비: -';
     return;
   }
 
-  document.getElementById('kpiTotalCost').innerText = formatMeso(result.totalExpCost, 3);
-  document.getElementById('kpiMedianCost').innerText = formatMeso(result.percentiles.p50, 3);
-  document.getElementById('kpiTop10Cost').innerText = formatMeso(result.percentiles.p10, 3);
-  document.getElementById('kpiBottom10Cost').innerText = formatMeso(result.percentiles.p90, 3);
+  document.getElementById('kpiTotalCost').innerText = formatMeso(result.totalExpCost);
+  document.getElementById('kpiMedianCost').innerText = formatMeso(result.percentiles.p50);
+  document.getElementById('kpiTop10Cost').innerText = formatMeso(result.percentiles.p10);
+  document.getElementById('kpiBottom10Cost').innerText = formatMeso(result.percentiles.p90);
   document.getElementById('kpiTotalDestroys').innerText = `${result.totalExpDestroys.toFixed(3)} 개`;
 
   // 대장장이 가격 (기댓값 × 1.08) 및 승률
   if (result.smithAnalysis) {
     const s = result.smithAnalysis;
-    document.getElementById('kpiSmithCost').innerText = formatMeso(s.smithCost, 3);
-    document.getElementById('kpiSmithDesc').innerText = `직작 승률: ${s.winProb.toFixed(1)}% (상위 ${s.percentileRank}%)`;
+    document.getElementById('kpiSmithCost').innerText = formatMeso(s.smithCost);
+    document.getElementById('kpiSmithDesc').innerText = `직작 승률: ${s.winProb.toFixed(1)}% (상위 ${s.percentileRank}% 선)`;
   }
 
   const pZero = (result.totalDestroyPMF[0] * 100).toFixed(2);
@@ -166,7 +151,7 @@ function renderKpis(result) {
   });
   
   document.getElementById('kpiPureAndBase').innerText = 
-    `순수강화: ${formatMeso(totalPureEnhance, 3)} | 복구비: ${formatMeso(totalBaseRecover, 3)}`;
+    `순수강화: ${formatMeso(totalPureEnhance)} | 복구비: ${formatMeso(totalBaseRecover)}`;
 }
 
 /**
@@ -175,7 +160,7 @@ function renderKpis(result) {
 function renderItemsList() {
   const container = document.getElementById('itemsListContainer');
   const badge = document.getElementById('itemCountBadge');
-  
+
   let totalCount = 0;
   state.items.forEach(i => totalCount += (parseInt(i.count) || 1));
   badge.innerText = totalCount;
@@ -184,7 +169,7 @@ function renderItemsList() {
     container.innerHTML = `
       <div class="empty-items-state">
         <i class="fa-solid fa-layer-group"></i>
-        <p>강화할 장비가 없습니다.<br>위의 프리셋 버튼이나 [+ 장비 추가]를 눌러보세요.</p>
+        <p>강화할 장비가 없습니다.<br>아래 <strong>[+ 장비 추가]</strong> 버튼을 눌러 강화 대상을 등록해보세요.</p>
       </div>
     `;
     return;
@@ -243,9 +228,8 @@ function renderCostChart(result) {
     return;
   }
 
-  const { totalCostPMF, totalCostCDF, binSize, percentiles } = result;
+  const { totalCostPMF, totalCostCDF, binSize, percentiles, smithAnalysis } = result;
 
-  // X축 샘플링 (100~200개 포인트로 가공)
   const maxIdx = totalCostPMF.length;
   const step = Math.max(1, Math.floor(maxIdx / 120));
   
@@ -256,13 +240,13 @@ function renderCostChart(result) {
   for (let i = 0; i < maxIdx; i += step) {
     const cost = i * binSize;
     labels.push(formatMeso(cost));
-    // 구간 합산 확률 밀도
-    let pSum = 0;
-    for (let k = 0; k < step && i + k < maxIdx; k++) {
-      pSum += totalCostPMF[i + k];
+    
+    let sumP = 0;
+    for (let j = i; j < Math.min(maxIdx, i + step); j++) {
+      sumP += totalCostPMF[j];
     }
-    pmfData.push(pSum * 100);
-    cdfData.push((totalCostCDF[Math.min(maxIdx - 1, i + step - 1)] * 100).toFixed(1));
+    pmfData.push((sumP * 100).toFixed(3));
+    cdfData.push((totalCostCDF[Math.min(totalCostCDF.length - 1, i + step - 1)] * 100).toFixed(2));
   }
 
   if (state.costChart) {
@@ -270,28 +254,26 @@ function renderCostChart(result) {
   }
 
   state.costChart = new Chart(ctx, {
-    type: 'line',
+    type: 'bar',
     data: {
       labels,
       datasets: [
         {
           type: 'line',
-          label: '누적 달성 확률 (CDF, %)',
+          label: '누적 달성률 (CDF %)',
           data: cdfData,
           borderColor: '#388bfd',
-          backgroundColor: 'transparent',
           borderWidth: 2.5,
           pointRadius: 0,
-          pointHoverRadius: 5,
           yAxisID: 'yCDF',
-          tension: 0.2
+          tension: 0.1
         },
         {
           type: 'bar',
-          label: '구간별 확률 밀도 (PDF, %)',
+          label: '비용 구간별 확률 밀도 (%)',
           data: pmfData,
-          backgroundColor: 'rgba(241, 224, 90, 0.25)',
-          borderColor: 'rgba(241, 224, 90, 0.8)',
+          backgroundColor: 'rgba(56, 139, 253, 0.25)',
+          borderColor: 'rgba(56, 139, 253, 0.8)',
           borderWidth: 1,
           borderRadius: 2,
           yAxisID: 'yPDF'
@@ -301,16 +283,10 @@ function renderCostChart(result) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      interaction: {
-        mode: 'index',
-        intersect: false
-      },
+      interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: {
-          labels: {
-            color: '#c9d1d9',
-            font: { size: 12, family: 'Pretendard' }
-          }
+          labels: { color: '#c9d1d9', font: { size: 12, family: 'Pretendard' } }
         },
         tooltip: {
           backgroundColor: 'rgba(19, 25, 34, 0.95)',
@@ -333,20 +309,12 @@ function renderCostChart(result) {
       scales: {
         x: {
           grid: { color: 'rgba(255, 255, 255, 0.05)' },
-          ticks: {
-            color: '#8b949e',
-            maxTicksLimit: 8,
-            font: { size: 11, family: 'Pretendard' }
-          }
+          ticks: { color: '#8b949e', maxTicksLimit: 8, font: { size: 11, family: 'Pretendard' } }
         },
         yPDF: {
           position: 'left',
           grid: { color: 'rgba(255, 255, 255, 0.05)' },
-          ticks: {
-            color: '#8b949e',
-            callback: (v) => `${v}%`,
-            font: { size: 11, family: 'Pretendard' }
-          },
+          ticks: { color: '#8b949e', callback: (v) => `${v}%`, font: { size: 11, family: 'Pretendard' } },
           title: { display: true, text: '구간 확률 (%)', color: '#8b949e' }
         },
         yCDF: {
@@ -354,11 +322,7 @@ function renderCostChart(result) {
           grid: { drawOnChartArea: false },
           min: 0,
           max: 100,
-          ticks: {
-            color: '#388bfd',
-            callback: (v) => `${v}%`,
-            font: { size: 11, family: 'Pretendard' }
-          },
+          ticks: { color: '#388bfd', callback: (v) => `${v}%`, font: { size: 11, family: 'Pretendard' } },
           title: { display: true, text: '누적 완료율 (%)', color: '#388bfd' }
         }
       }
@@ -498,10 +462,9 @@ function renderTables(result) {
         <td>${r.item.level}제</td>
         <td><span class="star-range">${r.item.startStar}성 → ${r.item.targetStar}성</span></td>
         <td>${r.count}개</td>
-        <td>${formatMeso(r.item.baseCost, 3)}</td>
+        <td>${formatMeso(r.item.baseCost)}</td>
         <td>
-          <div style="font-weight:700; color:var(--accent-gold);">${formatMeso(r.expCost, 3)}</div>
-          <div style="font-size:11px; color:#8b949e;">(${(r.expCost / 1e8).toFixed(3)}억 메소)</div>
+          <div style="font-weight:700; color:var(--accent-gold);">${formatMeso(r.expCost)}</div>
         </td>
         <td>
           <span style="color:#ff7b72; font-weight:700;">${r.expDestroys.toFixed(3)}개</span>
@@ -511,7 +474,7 @@ function renderTables(result) {
     `;
   }).join('');
 
-  // 백분위수 테이블 (소수점 3자리)
+  // 백분위수 테이블
   const p = result.percentiles;
   const s = result.smithAnalysis;
 
@@ -522,7 +485,7 @@ function renderTables(result) {
     { label: '상위 25%', meaning: '상위 25% 이내 완성', val: p.p25, tag: '' },
     { label: '중앙값 (50%)', meaning: '유저 평균/기준 중간선 (절반이 이 비용 이하)', val: p.p50, tag: 'tag-p50' },
     { label: '기대값 (평균 1.00배)', meaning: '수학적 기댓값 평균 비용', val: result.totalExpCost, tag: '' },
-    { label: `🔨 대장장이 가격 (1.08배)`, meaning: `직작 승률 ${s.winProb.toFixed(1)}% (이 가격 이하로 완성할 확률)`, val: s.smithCost, tag: 'tag-smith' },
+    { label: '🔨 대장장이 가격 (1.08배)', meaning: `직작 승률 ${s.winProb.toFixed(1)}% (이 가격 이하로 완성할 확률)`, val: s.smithCost, tag: 'tag-smith' },
     { label: '상위 75% (하위 25%)', meaning: '다소 운이 없는 편', val: p.p75, tag: '' },
     { label: '상위 90% (억까/안전선)', meaning: '90% 확률로 이 예산 내 완성 (추천 예산)', val: p.p90, tag: 'tag-p90' },
     { label: '상위 95% (심각한 억까)', meaning: '95% 확률로 이 예산 내 완성', val: p.p95, tag: 'tag-p90' },
@@ -536,12 +499,37 @@ function renderTables(result) {
         <td><span class="percentile-tag ${row.tag}">${row.label}</span></td>
         <td style="${isSmith ? 'color:#e6a23c; font-weight:600;' : 'color:#8b949e;'}">${row.meaning}</td>
         <td>
-          <strong style="${isSmith ? 'color:#e6a23c;' : ''}">${formatMeso(row.val, 3)}</strong>
-          <span style="font-size:11px; color:#8b949e; margin-left:4px;">(${(row.val / 1e8).toFixed(3)}억)</span>
+          <strong style="${isSmith ? 'color:#e6a23c;' : ''}">${formatMeso(row.val)}</strong>
         </td>
       </tr>
     `;
   }).join('');
+}
+
+/**
+ * 커스텀 프리셋 저장/불러오기/삭제 관리
+ */
+function getSavedPresets() {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY_PRESETS);
+    return data ? JSON.parse(data) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function savePresetsToStorage(presets) {
+  localStorage.setItem(STORAGE_KEY_PRESETS, JSON.stringify(presets));
+}
+
+function renderCustomPresetSelect() {
+  const sel = document.getElementById('selCustomPresets');
+  if (!sel) return;
+  const presets = getSavedPresets();
+  const keys = Object.keys(presets);
+
+  sel.innerHTML = '<option value="">-- 저장된 프리셋 선택 --</option>' +
+    keys.map(k => `<option value="${k}">${k} (${presets[k].length}개 장비)</option>`).join('');
 }
 
 /**
@@ -566,18 +554,20 @@ function openItemModal(editIdx = -1) {
     document.getElementById('inputItemLevel').value = it.level;
     document.getElementById('inputStartStar').value = it.startStar;
     document.getElementById('inputTargetStar').value = it.targetStar;
-    document.getElementById('inputBaseCost').value = it.baseCost;
+    // 만 메소 단위로 표시 (baseCost / 10000)
+    const baseCostInMan = Math.round(it.baseCost / 10000);
+    document.getElementById('inputBaseCost').value = baseCostInMan;
     document.getElementById('inputItemCount').value = it.count || 1;
-    document.getElementById('baseCostFormatted').innerText = formatMeso(it.baseCost);
+    document.getElementById('baseCostFormatted').innerText = formatManMeso(baseCostInMan);
   } else {
     title.innerText = '새 강화 장비 추가';
     document.getElementById('itemForm').reset();
     document.getElementById('inputItemLevel').value = 200;
     document.getElementById('inputStartStar').value = 0;
     document.getElementById('inputTargetStar').value = 22;
-    document.getElementById('inputBaseCost').value = 4000000000;
+    document.getElementById('inputBaseCost').value = 400000; // 40억 = 400,000만 메소
     document.getElementById('inputItemCount').value = 1;
-    document.getElementById('baseCostFormatted').innerText = formatMeso(4000000000);
+    document.getElementById('baseCostFormatted').innerText = formatManMeso(400000);
   }
 
   modal.classList.add('active');
@@ -622,7 +612,7 @@ function initEvents() {
     }
   });
 
-  // 복구 방식 라디오
+  // 복구 방식 라디오 (optimal, exact, rollback12)
   document.querySelectorAll('input[name="restoreMode"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
       document.querySelectorAll('#restoreModeRadioGroup .radio-btn').forEach(btn => btn.classList.remove('active'));
@@ -643,15 +633,50 @@ function initEvents() {
     runAnalysis();
   });
 
-  // 프리셋 빠른 추가 버튼들
-  document.querySelectorAll('.btn-preset').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const presetKey = btn.dataset.preset;
-      if (PRESET_SETS[presetKey]) {
-        state.items = JSON.parse(JSON.stringify(PRESET_SETS[presetKey]));
-        runAnalysis();
-      }
-    });
+  // 1. 커스텀 프리셋 저장 버튼
+  document.getElementById('btnSaveCustomPreset').addEventListener('click', () => {
+    if (state.items.length === 0) {
+      alert('저장할 장비 목록이 비어 있습니다. 먼저 장비를 추가하세요.');
+      return;
+    }
+    const presetName = prompt('저장할 프리셋의 이름을 입력하세요:', `내 프리셋 (${state.items.length}부위)`);
+    if (!presetName || !presetName.trim()) return;
+
+    const presets = getSavedPresets();
+    presets[presetName.trim()] = JSON.parse(JSON.stringify(state.items));
+    savePresetsToStorage(presets);
+    renderCustomPresetSelect();
+    document.getElementById('selCustomPresets').value = presetName.trim();
+    alert(`'${presetName.trim()}' 프리셋이 저장되었습니다!`);
+  });
+
+  // 2. 커스텀 프리셋 불러오기 버튼
+  document.getElementById('btnLoadCustomPreset').addEventListener('click', () => {
+    const selectedKey = document.getElementById('selCustomPresets').value;
+    if (!selectedKey) {
+      alert('불러올 프리셋을 먼저 선택하세요.');
+      return;
+    }
+    const presets = getSavedPresets();
+    if (presets[selectedKey]) {
+      state.items = JSON.parse(JSON.stringify(presets[selectedKey]));
+      runAnalysis();
+    }
+  });
+
+  // 3. 커스텀 프리셋 삭제 버튼
+  document.getElementById('btnDeleteCustomPreset').addEventListener('click', () => {
+    const selectedKey = document.getElementById('selCustomPresets').value;
+    if (!selectedKey) {
+      alert('삭제할 프리셋을 선택하세요.');
+      return;
+    }
+    if (confirm(`'${selectedKey}' 프리셋을 정말 삭제하시겠습니까?`)) {
+      const presets = getSavedPresets();
+      delete presets[selectedKey];
+      savePresetsToStorage(presets);
+      renderCustomPresetSelect();
+    }
   });
 
   // 전체 비우기 & 추가 모달
@@ -666,34 +691,38 @@ function initEvents() {
   document.getElementById('btnCloseModal').addEventListener('click', closeItemModal);
   document.getElementById('btnCancelModal').addEventListener('click', closeItemModal);
 
-  // 모달 내 프리셋 변경 시 자동 입력
+  // 모달 내 프리셋 변경 시 자동 입력 (만 메소 단위로 변환)
   document.getElementById('inputItemPreset').addEventListener('change', (e) => {
     const pId = e.target.value;
     const preset = STARFORCE_CONFIG.itemPresets.find(p => p.id === pId);
     if (preset) {
       document.getElementById('inputItemName').value = preset.name;
       document.getElementById('inputItemLevel').value = preset.level;
-      document.getElementById('inputBaseCost').value = preset.defaultBaseCost;
-      document.getElementById('baseCostFormatted').innerText = formatMeso(preset.defaultBaseCost);
+      const manCost = Math.round(preset.defaultBaseCost / 10000);
+      document.getElementById('inputBaseCost').value = manCost;
+      document.getElementById('baseCostFormatted').innerText = formatManMeso(manCost);
     }
   });
 
-  // 노작 비용 실시간 포맷 표시
+  // 노작 비용 실시간 포맷 표시 (만 메소 단위 입력 -> 한글 포맷팅)
   document.getElementById('inputBaseCost').addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value) || 0;
-    document.getElementById('baseCostFormatted').innerText = formatMeso(val);
+    const manVal = parseFloat(e.target.value) || 0;
+    document.getElementById('baseCostFormatted').innerText = formatManMeso(manVal);
   });
 
   // 장비 저장 폼
   document.getElementById('itemForm').addEventListener('submit', (e) => {
     e.preventDefault();
+    const manVal = parseFloat(document.getElementById('inputBaseCost').value) || 0;
+    const baseCostInMeso = manVal * 10000; // 만 메소 -> 순수 메소로 변환
+
     const itemData = {
       id: 'item_' + Date.now(),
       name: document.getElementById('inputItemName').value.trim() || '장비',
       level: parseInt(document.getElementById('inputItemLevel').value) || 200,
       startStar: parseInt(document.getElementById('inputStartStar').value) || 0,
       targetStar: parseInt(document.getElementById('inputTargetStar').value) || 22,
-      baseCost: parseFloat(document.getElementById('inputBaseCost').value) || 0,
+      baseCost: baseCostInMeso,
       count: parseInt(document.getElementById('inputItemCount').value) || 1
     };
 
@@ -726,10 +755,10 @@ function initEvents() {
       let report = `📊 [메이플 스타포스 강화 분석 리포트]\n`;
       report += `• 적용 이벤트: ${calculatedOptions.event || '없음'}\n`;
       report += `• 자동 최적화(DP): ${calculatedOptions.autoOptimize ? 'ON (최소 비용 최적화)' : 'OFF'}\n`;
-      report += `• 총 기대 비용: ${formatMeso(result.totalExpCost, 3)} (${(result.totalExpCost / 1e8).toFixed(3)}억 메소)\n`;
-      report += `• 중앙값(50%): ${formatMeso(result.percentiles.p50, 3)}\n`;
-      report += `• 상위 10%(대박): ${formatMeso(result.percentiles.p10, 3)}\n`;
-      report += `• 하위 10%(억까선): ${formatMeso(result.percentiles.p90, 3)}\n`;
+      report += `• 총 기대 비용: ${formatMeso(result.totalExpCost)}\n`;
+      report += `• 중앙값(50%): ${formatMeso(result.percentiles.p50)}\n`;
+      report += `• 상위 10%(대박): ${formatMeso(result.percentiles.p10)}\n`;
+      report += `• 하위 10%(억까선): ${formatMeso(result.percentiles.p90)}\n`;
       report += `• 기대 소모 장비: ${result.totalExpDestroys.toFixed(3)}개 (노파괴 확률 ${(result.totalDestroyPMF[0] * 100).toFixed(2)}%)\n\n`;
 
       report += `📋 [장비별 세부 전략 & 기댓값]\n`;
@@ -737,24 +766,24 @@ function initEvents() {
         const optimal = StarforceOptimizer.getOptimalReinforcement(r.item, calculatedOptions.event, calculatedOptions.mvpDiscount, calculatedOptions.pcRoom);
         const safeStr = optimal.destroyPrevention.length > 0 ? `[${optimal.destroyPrevention.join(',')}성 파방]` : `[파방 미사용]`;
         const restStr = optimal.restore.length > 0 ? `[${optimal.restore.join(',')}성 확정복구]` : `[12성 롤백]`;
-        report += `• ${r.name} (${r.item.level}제 | ${r.item.startStar}→${r.item.targetStar}성 | ${r.count}개): ${formatMeso(r.expCost, 3)} | 파괴: ${r.expDestroys.toFixed(3)}개 | ${safeStr} ${restStr}\n`;
+        report += `• ${r.name} (${r.item.level}제 | ${r.item.startStar}→${r.item.targetStar}성 | ${r.count}개): ${formatMeso(r.expCost)} | 파괴: ${r.expDestroys.toFixed(3)}개 | ${safeStr} ${restStr}\n`;
       });
 
       report += `\n📈 [비용 백분위수 컷라인 & 대장장이 비교]\n`;
-      report += `• 상위 1%: ${formatMeso(result.percentiles.p1, 3)}\n`;
-      report += `• 상위 5%: ${formatMeso(result.percentiles.p5, 3)}\n`;
-      report += `• 상위 10%: ${formatMeso(result.percentiles.p10, 3)}\n`;
-      report += `• 상위 25%: ${formatMeso(result.percentiles.p25, 3)}\n`;
-      report += `• 중앙값 (50%): ${formatMeso(result.percentiles.p50, 3)}\n`;
-      report += `• 기댓값 (평균 1.00배): ${formatMeso(result.totalExpCost, 3)}\n`;
+      report += `• 상위 1%: ${formatMeso(result.percentiles.p1)}\n`;
+      report += `• 상위 5%: ${formatMeso(result.percentiles.p5)}\n`;
+      report += `• 상위 10%: ${formatMeso(result.percentiles.p10)}\n`;
+      report += `• 상위 25%: ${formatMeso(result.percentiles.p25)}\n`;
+      report += `• 중앙값 (50%): ${formatMeso(result.percentiles.p50)}\n`;
+      report += `• 기댓값 (평균 1.00배): ${formatMeso(result.totalExpCost)}\n`;
       if (result.smithAnalysis) {
         const sm = result.smithAnalysis;
-        report += `• 🔨 대장장이 가격 (1.08배): ${formatMeso(sm.smithCost, 3)} (직작 승률 ${sm.winProb.toFixed(1)}% | 상위 ${sm.percentileRank}%선)\n`;
+        report += `• 🔨 대장장이 가격 (1.08배): ${formatMeso(sm.smithCost)} (직작 승률 ${sm.winProb.toFixed(1)}% | 상위 ${sm.percentileRank}%선)\n`;
       }
-      report += `• 상위 75%: ${formatMeso(result.percentiles.p75, 3)}\n`;
-      report += `• 상위 90% (추천 예산): ${formatMeso(result.percentiles.p90, 3)}\n`;
-      report += `• 상위 95%: ${formatMeso(result.percentiles.p95, 3)}\n`;
-      report += `• 상위 99%: ${formatMeso(result.percentiles.p99, 3)}\n`;
+      report += `• 상위 75%: ${formatMeso(result.percentiles.p75)}\n`;
+      report += `• 상위 90% (추천 예산): ${formatMeso(result.percentiles.p90)}\n`;
+      report += `• 상위 95%: ${formatMeso(result.percentiles.p95)}\n`;
+      report += `• 상위 99%: ${formatMeso(result.percentiles.p99)}\n`;
 
       navigator.clipboard.writeText(report).then(() => {
         alert('📋 분석 리포트가 클립보드에 복사되었습니다!\n메이플 인벤, 디스코드, 메모장 등에 붙여넣기(Ctrl+V)하세요.');
@@ -776,15 +805,15 @@ function initEvents() {
       }
 
       let csv = '\uFEFF'; // UTF-8 BOM for Excel
-      csv += '구분,장비명,레벨,시작성수,목표성수,수량,노작비용(메소),기대비용(메소),기대비용(억),평균파괴수,최적파방,최적복구\n';
+      csv += '구분,장비명,레벨,시작성수,목표성수,수량,노작비용(메소),기대비용(메소),평균파괴수,최적파방,최적복구\n';
       result.items.forEach(r => {
         const optimal = StarforceOptimizer.getOptimalReinforcement(r.item, calculatedOptions.event, calculatedOptions.mvpDiscount, calculatedOptions.pcRoom);
         const safeStr = optimal.destroyPrevention.join(' ') || '미사용';
         const restStr = optimal.restore.join(' ') || '12성롤백';
-        csv += `장비,${r.name},${r.item.level},${r.item.startStar},${r.item.targetStar},${r.count},${r.item.baseCost},${Math.round(r.expCost)},${(r.expCost / 1e8).toFixed(3)},${r.expDestroys.toFixed(3)},${safeStr},${restStr}\n`;
+        csv += `장비,${r.name},${r.item.level},${r.item.startStar},${r.item.targetStar},${r.count},${r.item.baseCost},${Math.round(r.expCost)},${r.expDestroys.toFixed(3)},${safeStr},${restStr}\n`;
       });
 
-      csv += '\n백분위,비용(메소),비용(억),설명\n';
+      csv += '\n백분위,비용(메소),설명\n';
       const p = result.percentiles;
       const s = result.smithAnalysis;
       const percData = [
@@ -801,7 +830,7 @@ function initEvents() {
         ['상위 99%', p.p99, '파멸적 억까']
       ];
       percData.forEach(([label, val, desc]) => {
-        csv += `${label},${Math.round(val)},${(val / 1e8).toFixed(3)},${desc}\n`;
+        csv += `${label},${Math.round(val)},${desc}\n`;
       });
 
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -825,9 +854,9 @@ function initEvents() {
         items: state.items,
         summary: {
           totalExpCost: result.totalExpCost,
-          totalExpCostEok: (result.totalExpCost / 1e8).toFixed(3),
           totalExpDestroys: result.totalExpDestroys,
-          percentiles: result.percentiles
+          percentiles: result.percentiles,
+          smithAnalysis: result.smithAnalysis
         },
         itemBreakdown: result.items.map(r => ({
           name: r.name,
@@ -851,6 +880,7 @@ function initEvents() {
 
 // 초기화
 window.addEventListener('DOMContentLoaded', () => {
+  renderCustomPresetSelect();
   initEvents();
   runAnalysis();
 });

@@ -45,15 +45,11 @@
           
           <div class="options-grid">
             <div class="option-item">
-              <label class="option-label">스타포스 이벤트 선택 (mesulive & starforce.gg)</label>
+              <label class="option-label">스타포스 이벤트 선택</label>
               <select id="selEvent" class="custom-select">
-                <option value="샤타포스(15 16 포함)" selected>샤이닝 스타포스 (+ 5/10/15성 100%)</option>
-                <option value="샤타포스">샤이닝 스타포스 (30% 할인 + 21성 파괴 30% 감소)</option>
-                <option value="샤타포스(+흔적 복구 비용 20% 할인)">샤이닝 (+ 흔적 복구 메소 20% 할인)</option>
-                <option value="30% 할인">비용 30% 할인</option>
-                <option value="5/10/15성 100%">5, 10, 15성 성공확률 100%</option>
-                <option value="21성 이하 파괴 확률 30% 감소">21성 이하 파괴확률 30% 감소</option>
-                <option value="10성 이하 1+1">10성 이하에서 강화 시 1+1</option>
+                <option value="샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인 + 5/10/15성 100%)" selected>
+                  샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인 + 5/10/15성 100%)
+                </option>
                 <option value="none">이벤트 없음</option>
               </select>
             </div>
@@ -87,15 +83,18 @@
               </div>
             </div>
 
-            <!-- 흔적 복구 방식 설정 -->
+            <!-- 흔적 복구 방식 설정 (성수별 최대 효율 복구 지원) -->
             <div class="option-item">
               <label class="option-label">파괴 시 복구 방식</label>
               <div class="radio-group" id="restoreModeRadioGroup">
-                <label class="radio-btn active">
-                  <input type="radio" name="restoreMode" value="exact" checked> 직전 성수 온전 복구 (메소+스페어)
+                <label class="radio-btn active" title="각 성수마다 직전 성수 복구와 12성 롤백 중 손익분기점을 따져 최소 비용이 되는 방식 자동 채택">
+                  <input type="radio" name="restoreMode" value="optimal" checked> 성수별 최대 효율 복구
                 </label>
                 <label class="radio-btn">
-                  <input type="radio" name="restoreMode" value="rollback12"> 12성 롤백 복구 (스페어 1개만)
+                  <input type="radio" name="restoreMode" value="exact"> 직전 성수 복구 (메소+스페어)
+                </label>
+                <label class="radio-btn">
+                  <input type="radio" name="restoreMode" value="rollback12"> 12성 롤백 복구 (스페어만)
                 </label>
               </div>
             </div>
@@ -123,27 +122,26 @@
           </div>
         </section>
 
-        <!-- Item Presets Section -->
+        <!-- Custom Preset Management Section -->
         <section class="card preset-card">
-          <div class="card-title">
-            <i class="fa-solid fa-wand-magic-sparkles"></i>
-            <span>빠른 세트 프리셋 추가</span>
+          <div class="card-header-flex">
+            <div class="card-title">
+              <i class="fa-solid fa-bookmark" style="color:var(--primary);"></i>
+              <span>내 커스텀 프리셋</span>
+            </div>
+            <button type="button" class="btn-sm btn-secondary" id="btnSaveCustomPreset">
+              <i class="fa-solid fa-plus"></i> 현재 목록을 프리셋으로 저장
+            </button>
           </div>
-          <div class="preset-buttons">
-            <button type="button" class="btn-preset" data-preset="eternal4">
-              <i class="fa-solid fa-shield-halved"></i> 에테르넬 4부위 (22성)
+          <div class="custom-preset-row">
+            <select id="selCustomPresets" class="custom-select" style="flex:1;">
+              <option value="">-- 저장된 프리셋 선택 --</option>
+            </select>
+            <button type="button" class="btn-sm btn-primary" id="btnLoadCustomPreset">
+              <i class="fa-solid fa-folder-open"></i> 불러오기
             </button>
-            <button type="button" class="btn-preset" data-preset="darkboss5">
-              <i class="fa-solid fa-gem"></i> 칠흑 5부위 (22성)
-            </button>
-            <button type="button" class="btn-preset" data-preset="arcane5">
-              <i class="fa-solid fa-crown"></i> 아케인 5부위 (22성)
-            </button>
-            <button type="button" class="btn-preset" data-preset="dawn4">
-              <i class="fa-solid fa-sun"></i> 여명 4부위 (22성)
-            </button>
-            <button type="button" class="btn-preset" data-preset="cra3">
-              <i class="fa-solid fa-hat-wizard"></i> 카루타 3부위 (22성)
+            <button type="button" class="btn-sm btn-danger-sm" id="btnDeleteCustomPreset" title="선택한 프리셋 삭제">
+              <i class="fa-solid fa-trash"></i>
             </button>
           </div>
         </section>
@@ -380,10 +378,13 @@
 
         <div class="form-row-2">
           <div class="form-group">
-            <label for="inputBaseCost">노작 장비 가격 (메소)</label>
+            <label for="inputBaseCost">노작 장비 가격 (단위: <strong>만 메소</strong>)</label>
             <div class="input-unit-wrapper">
-              <input type="number" id="inputBaseCost" class="custom-input" min="0" step="1000000" value="4000000000" required>
-              <span class="unit-text" id="baseCostFormatted">40억 메소</span>
+              <input type="number" id="inputBaseCost" class="custom-input" min="0" step="1" value="400000" placeholder="예: 32 (32만) / 400000 (40억)" required>
+              <span class="unit-text" id="baseCostFormatted">40억 0000만 메소</span>
+            </div>
+            <div style="font-size:11px; color:#8b949e; margin-top:2px;">
+              ※ 만 메소 단위 입력 (예: 32 = 32만 메소, 150000 = 15억 메소, 400000 = 40억 메소)
             </div>
           </div>
           <div class="form-group">
