@@ -2104,12 +2104,15 @@ class StarforceOptimizer {
       let minCost = costRollback;
       let stepDestroys = rawDestroy / rawSuccess;
 
+      // 15성은 복구비가 롤백보다 저렴하면 채택, 16~17성은 5% 이상 유의미하게 저렴할 때만 채택
+      const isRestoreValid = (s === 15) ? (restoreLoss < rollbackLoss) : (restoreLoss < rollbackLoss * 0.95);
+
       if (costSafe <= costRestore && costSafe <= costRollback) {
         chosenStrategy = 'safeguard';
         minCost = costSafe;
         stepDestroys = 0;
         optimalSafeguard.push(s);
-      } else if (costRestore <= costRollback) {
+      } else if (isRestoreValid) {
         chosenStrategy = 'restore';
         minCost = costRestore;
         optimalRestore.push(s);
@@ -2147,8 +2150,8 @@ class StarforceOptimizer {
       const costRestore = (normalCost + rawDestroy * restoreLoss) / rawSuccess;
       const costRollback = (normalCost + rawDestroy * rollbackLoss) / rawSuccess;
 
-      // 18성 이상에서는 복구 손실이 롤백 손실보다 확실히 저렴할 때만 채택 (동일 수준 시 롤백 권장)
-      const isRestoreBetter = (restoreLoss < rollbackLoss);
+      // 18성 이상에서는 스페어가 2~4개 소모되므로, 복구 손실이 롤백 손실보다 최소 5% 이상 확실히 저렴할 때만 채택
+      const isRestoreBetter = (restoreLoss < rollbackLoss * 0.95);
       const minCost = isRestoreBetter ? costRestore : costRollback;
 
       if (isRestoreBetter) {
