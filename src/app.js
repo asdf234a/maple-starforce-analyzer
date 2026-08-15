@@ -581,35 +581,43 @@ function renderCustomPresetChips() {
 }
 
 /**
- * 모달 열기/닫기 & 빠른 템플릿 칩 렌더링
+ * 모달 열기/닫기 & 렙제(250, 200, 160, 150, 140, 130) 칩 연동
  */
 let currentEditIdx = -1;
 
-function renderModalTemplateChips() {
-  const container = document.getElementById('modalTemplateChips');
-  if (!container) return;
+function selectModalLevel(level) {
+  document.getElementById('inputItemLevel').value = level;
+  document.querySelectorAll('#modalLevelChips .level-chip').forEach(btn => {
+    if (parseInt(btn.dataset.level) === parseInt(level)) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+}
 
-  container.innerHTML = STARFORCE_CONFIG.itemPresets.map(p => `
-    <button type="button" class="template-chip" data-id="${p.id}">
-      ${p.name} (${p.level}제)
-    </button>
-  `).join('');
-
-  container.querySelectorAll('.template-chip').forEach(chip => {
-    chip.addEventListener('click', (e) => {
+function initModalLevelChips() {
+  document.querySelectorAll('#modalLevelChips .level-chip').forEach(btn => {
+    btn.addEventListener('click', (e) => {
       e.preventDefault();
-      e.stopPropagation();
-      const pId = chip.dataset.id;
-      const preset = STARFORCE_CONFIG.itemPresets.find(p => p.id === pId);
-      if (preset) {
-        document.getElementById('inputItemName').value = preset.name;
-        document.getElementById('inputItemLevel').value = preset.level;
-        const manCost = Math.round(preset.defaultBaseCost / 10000);
-        document.getElementById('inputBaseCost').value = manCost;
-        document.getElementById('baseCostFormatted').innerText = formatManMeso(manCost);
-      }
+      const lvl = parseInt(btn.dataset.level);
+      selectModalLevel(lvl);
     });
   });
+
+  const levelInput = document.getElementById('inputItemLevel');
+  if (levelInput) {
+    levelInput.addEventListener('input', (e) => {
+      const lvl = parseInt(e.target.value);
+      document.querySelectorAll('#modalLevelChips .level-chip').forEach(btn => {
+        if (parseInt(btn.dataset.level) === lvl) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    });
+  }
 }
 
 function openItemModal(editIdx = -1) {
@@ -617,13 +625,11 @@ function openItemModal(editIdx = -1) {
   const modal = document.getElementById('itemModal');
   const title = document.getElementById('modalTitle');
 
-  renderModalTemplateChips();
-
   if (editIdx >= 0) {
     title.innerText = '강화 장비 수정';
     const it = state.items[editIdx];
     document.getElementById('inputItemName').value = it.name || '장비';
-    document.getElementById('inputItemLevel').value = it.level || 200;
+    selectModalLevel(it.level || 200);
     document.getElementById('inputStartStar').value = it.startStar ?? 0;
     document.getElementById('inputTargetStar').value = it.targetStar ?? 22;
     const baseCostInMan = Math.round((it.baseCost || 0) / 10000);
@@ -632,13 +638,13 @@ function openItemModal(editIdx = -1) {
     document.getElementById('baseCostFormatted').innerText = formatManMeso(baseCostInMan);
   } else {
     title.innerText = '새 강화 장비 추가';
-    document.getElementById('inputItemName').value = '근원의 속삭임';
-    document.getElementById('inputItemLevel').value = 250;
+    document.getElementById('inputItemName').value = '';
+    selectModalLevel(200);
     document.getElementById('inputStartStar').value = 0;
     document.getElementById('inputTargetStar').value = 22;
-    document.getElementById('inputBaseCost').value = 60000; // 6억 = 60,000만 메소
+    document.getElementById('inputBaseCost').value = 100000; // 10억 = 100,000만 메소
     document.getElementById('inputItemCount').value = 1;
-    document.getElementById('baseCostFormatted').innerText = formatManMeso(60000);
+    document.getElementById('baseCostFormatted').innerText = formatManMeso(100000);
   }
 
   modal.classList.add('active');
@@ -948,6 +954,7 @@ window.closeItemModal = closeItemModal;
 // 초기화
 function bootstrap() {
   renderCustomPresetChips();
+  initModalLevelChips();
   initEvents();
   runAnalysis();
 }
