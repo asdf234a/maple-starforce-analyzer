@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>메이플스토리 스타포스 다중 강화 비용 & 파괴 분포 분석기</title>
+  <!-- Google Fonts & Font Awesome Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="logo-icon"><i class="fa-solid fa-star"></i></div>
+        <div class="header-text">
+          <h1>스타포스 다중 강화 분포 분석기</h1>
+          <div class="header-subtitle">
+            <span class="badge patch-badge">2026년 최신 공식 기준</span>
+            <span class="patch-desc">하락 0% 삭제 · 파괴 복구 규정(성수별 노작 1~4개 + 메소) · FFT 결합 연산 (※ 시뮬레이션 기반 확률 모델로 미세한 오차가 발생할 수 있습니다)</span>
+          </div>
+        </div>
+      </div>
+      <div class="header-status">
+        <span class="engine-indicator"><i class="fa-solid fa-bolt"></i> FFT & DP Hybrid Engine</span>
+      </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <div class="main-layout">
+      <!-- Left Panel: Settings & Items -->
+      <aside class="control-panel">
+        <!-- Global Options Section -->
+        <section class="card config-card">
+          <div class="card-title">
+            <i class="fa-solid fa-sliders"></i>
+            <span>강화 조건 및 혜택 설정</span>
+          </div>
+
+          <div class="options-grid">
+            <!-- 1. 스타포스 이벤트 토글 -->
+            <div class="option-item">
+              <label class="option-label">스타포스 이벤트</label>
+              <label class="event-toggle-card">
+                <div class="event-toggle-info">
+                  <div class="event-toggle-title">샤이닝 스타포스</div>
+                  <div class="event-toggle-desc">비용 30% 할인 · 21성 이하 파괴 30% 감소 · 흔적 복구 메소 20% 할인</div>
+                </div>
+                <div class="toggle-switch">
+                  <input type="checkbox" id="chkShiningEvent" checked>
+                  <span class="toggle-slider"></span>
+                </div>
+              </label>
+            </div>
+
+            <!-- 2. MVP 등급 버튼 그룹 -->
+            <div class="option-item">
+              <label class="option-label">MVP 등급 할인</label>
+              <div class="pill-button-group" id="mvpButtonGroup">
+                <button type="button" class="pill-btn active" data-value="0">일반 (0%)</button>
+                <button type="button" class="pill-btn" data-value="0.03">실버 (3%)</button>
+                <button type="button" class="pill-btn" data-value="0.05">골드 (5%)</button>
+                <button type="button" class="pill-btn" data-value="0.10">다이아 (10%)</button>
+              </div>
+            </div>
+
+            <!-- 3. PC방 할인 토글 -->
+            <div class="option-item">
+              <div class="pc-room-row">
+                <span class="pc-room-label">
+                  <i class="fa-solid fa-desktop"></i> 프리미엄 PC방 할인 (5%)
+                </span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="chkPcRoom">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- 4. 자동 최적화 안내 -->
+            <div class="option-item">
+              <div class="optimization-status-banner">
+                <i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent-gold); margin-top:2px;"></i>
+                <div>
+                  <div style="font-size:12.5px; font-weight:700; color:#f0f6fc;">강화 경로 자동 최적화 (DP) 상시 가동</div>
+                  <div style="font-size:11px; color:#8b949e; margin-top:2px; line-height:1.4;">
+                    각 성수별로 파괴방지·확정복구·12성 롤백 중 수학적 비용이 최소화되는 경로를 자동 선택하여 계산합니다.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Custom Preset Section -->
+        <section class="card preset-card">
+          <div class="card-header-flex">
+            <div class="card-title">
+              <i class="fa-solid fa-bookmark"></i>
+              <span>내 커스텀 프리셋</span>
+            </div>
+            <button type="button" class="btn-sm btn-secondary" id="btnSaveCustomPreset">
+              <i class="fa-solid fa-plus"></i> 현재 목록 저장
+            </button>
+          </div>
+          <div class="preset-chips-container" id="presetChipsContainer">
+            <!-- Populated via JS -->
+          </div>
+        </section>
+
+        <!-- Target Items List Section -->
+        <section class="card items-card">
+          <div class="card-header-flex">
+            <div class="card-title">
+              <i class="fa-solid fa-list-check"></i>
+              <span>강화 대상 장비 목록 (<span id="itemCountBadge">0</span>개)</span>
+            </div>
+            <div class="header-actions">
+              <button type="button" id="btnClearItems" class="btn-text-danger" title="목록 비우기">
+                <i class="fa-solid fa-trash-can"></i> 전체 비우기
+              </button>
+              <button type="button" id="btnAddCustomItem" class="btn-primary-sm">
+                <i class="fa-solid fa-plus"></i> 장비 추가
+              </button>
+            </div>
+          </div>
+
+          <div class="items-list-scroll" id="itemsListContainer">
+            <!-- Items injected via JavaScript -->
+          </div>
+        </section>
+      </aside>
+
+      <!-- Right Panel: Analytics Dashboard -->
+      <main class="dashboard-panel">
+        <!-- 상단 KPI 지표 카드 그리드 (한눈에 들어오는 5개 핵심 요약) -->
+        <div class="kpi-header-row">
+          <h2 class="section-title"><i class="fa-solid fa-chart-line"></i> 강화 분석 요약</h2>
+          <div class="export-btn-group">
+            <button type="button" class="btn btn-secondary btn-sm" id="btnCopyTextReport">
+              <i class="fa-solid fa-copy"></i> 텍스트 복사
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btnExportCsv">
+              <i class="fa-solid fa-file-csv"></i> CSV 다운로드
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btnExportJson">
+              <i class="fa-solid fa-file-code"></i> JSON 저장
+            </button>
+          </div>
+        </div>
+
+        <div class="kpi-grid">
+          <!-- 1. 총 기대 비용 (평균) -->
+          <div class="kpi-card highlight-kpi">
+            <div class="kpi-icon"><i class="fa-solid fa-coins"></i></div>
+            <div class="kpi-content">
+              <div class="kpi-label">총 기대 비용 (평균)</div>
+              <div class="kpi-value" id="kpiTotalCost">-</div>
+              <div class="kpi-sub" id="kpiPureAndBase">순수강화: - | 복구비: -</div>
+            </div>
+          </div>
+
+          <!-- 2. 중앙값 (상위 50%) -->
+          <div class="kpi-card">
+            <div class="kpi-icon median-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+            <div class="kpi-content">
+              <div class="kpi-label">중앙값 (상위 50%)</div>
+              <div class="kpi-value" id="kpiMedianCost">-</div>
+              <div class="kpi-sub">유저 50%가 이 비용 이내로 완성</div>
+            </div>
+          </div>
+
+          <!-- 3. 대장장이 가격 (1.08배) -->
+          <div class="kpi-card smith-card">
+            <div class="kpi-icon smith-icon"><i class="fa-solid fa-hammer"></i></div>
+            <div class="kpi-content">
+              <div class="kpi-label">대장장이 가격 (기댓값 1.08배)</div>
+              <div class="kpi-value" id="kpiSmithCost">-</div>
+              <div class="kpi-sub" id="kpiSmithDesc">직작 승률: -%</div>
+            </div>
+          </div>
+
+          <!-- 4. 추천 예산 범위 (상위 10% ~ 90%) -->
+          <div class="kpi-card">
+            <div class="kpi-icon lucky-card-icon"><i class="fa-solid fa-arrows-left-right-to-line"></i></div>
+            <div class="kpi-content">
+              <div class="kpi-label">상위 10% ~ 90% 예산 범위</div>
+              <div class="kpi-value range-value" id="kpiBudgetSpan">-</div>
+              <div class="kpi-sub">상위 10%: <span id="kpiTop10Cost">-</span> / 상위 90%: <span id="kpiBottom10Cost">-</span></div>
+            </div>
+          </div>
+
+          <!-- 5. 예상 소모 장비 (평균 파괴수) -->
+          <div class="kpi-card destroy-card">
+            <div class="kpi-icon"><i class="fa-solid fa-heart-crack"></i></div>
+            <div class="kpi-content">
+              <div class="kpi-label">예상 소모 장비 (평균 파괴)</div>
+              <div class="kpi-value" id="kpiTotalDestroys">-</div>
+              <div class="kpi-sub" id="kpiZeroDestroyProb">노파괴(0개) 확률: -%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Grid (2단 배치) -->
+        <div class="charts-container">
+          <div class="card chart-card">
+            <div class="chart-header">
+              <div class="chart-title">
+                <i class="fa-solid fa-chart-area"></i>
+                <span>누적 달성률 & 비용 분포도 (CDF / PDF)</span>
+              </div>
+              <span class="chart-desc">파란선: 누적 완료 확률 (%) | 막대: 구간별 확률 밀도</span>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="costDistChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card chart-card">
+            <div class="chart-header">
+              <div class="chart-title">
+                <i class="fa-solid fa-burst"></i>
+                <span>장비 파괴 횟수별 발생 확률</span>
+              </div>
+              <span class="chart-desc">강화 중 총 파괴 장비 수의 확률 분포</span>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="destroyDistChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tables Grid (장비별 상세 & 백분위수) -->
+        <div class="tables-container">
+          <div class="card table-card">
+            <div class="card-title">
+              <i class="fa-solid fa-table-list"></i>
+              <span>장비별 강화 세부 기여도 & 최적화 전략</span>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table" id="itemBreakdownTable">
+                <thead>
+                  <tr>
+                    <th>장비명 & 추천 전략</th>
+                    <th>레벨</th>
+                    <th>성수 구간</th>
+                    <th>수량</th>
+                    <th>노작 가격</th>
+                    <th>기대 비용</th>
+                    <th>평균 파괴</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card table-card">
+            <div class="card-title">
+              <i class="fa-solid fa-ranking-star"></i>
+              <span>비용 백분위수 (상위 X% 도달 예산)</span>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table" id="percentileTable">
+                <thead>
+                  <tr>
+                    <th>분포 기준</th>
+                    <th>설명</th>
+                    <th>필요 예산</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Custom Item Modal -->
+  <div class="modal-overlay" id="itemModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">강화 대상 장비 추가</h3>
+        <button type="button" class="btn-close-modal" id="btnCloseModal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="itemForm" class="modal-body">
+        <input type="hidden" id="editItemId" value="">
+        
+        <div class="form-group">
+          <label>빠른 장비 템플릿 선택</label>
+          <div class="template-chips-container" id="modalTemplateChips">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputItemName">장비 이름</label>
+          <input type="text" id="inputItemName" class="custom-input" placeholder="예: 거대한 공포" required>
+        </div>
+
+        <div class="form-row-3">
+          <div class="form-group">
+            <label for="inputItemLevel">장비 레벨</label>
+            <input type="number" id="inputItemLevel" class="custom-input" min="100" max="300" step="10" value="200" required>
+          </div>
+          <div class="form-group">
+            <label for="inputStartStar">시작 성수</label>
+            <input type="number" id="inputStartStar" class="custom-input" min="0" max="29" value="0" required>
+          </div>
+          <div class="form-group">
+            <label for="inputTargetStar">목표 성수</label>
+            <input type="number" id="inputTargetStar" class="custom-input" min="1" max="30" value="22" required>
+          </div>
+        </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="inputBaseCost">노작 장비 가격 (단위: <strong>만 메소</strong>)</label>
+            <div class="input-unit-wrapper">
+              <input type="number" id="inputBaseCost" class="custom-input" min="0" step="1" value="400000" placeholder="예: 32 (32만) / 400000 (40억)" required>
+              <span class="unit-text" id="baseCostFormatted">40억 0000만 메소</span>
+            </div>
+            <div style="font-size:11px; color:#8b949e; margin-top:2px;">
+              ※ 만 메소 단위 입력 (예: 32 = 32만 메소, 150000 = 15억 메소, 400000 = 40억 메소)
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="inputItemCount">수량 (개)</label>
+            <input type="number" id="inputItemCount" class="custom-input" min="1" max="20" value="1" required>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" id="btnCancelModal">취소</button>
+          <button type="submit" class="btn-primary" id="btnSaveItem">저장 및 적용</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

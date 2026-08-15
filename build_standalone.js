@@ -1,6 +1,6 @@
 import fs from 'fs';
 
-const html = fs.readFileSync('index.html', 'utf-8');
+const html = fs.readFileSync('template.html', 'utf-8');
 const css = fs.readFileSync('style.css', 'utf-8');
 
 function cleanJs(code) {
