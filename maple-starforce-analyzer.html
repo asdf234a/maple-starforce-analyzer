@@ -2214,7 +2214,10 @@ class StarforceOptimizer {
       totalTrials += 1 / pSuccess;
     }
 
-    // 12성부터 22성까지의 단계별 비용 합산
+    // 12성부터 각 성수까지의 마르코프 누적 파괴수 D 계산
+    const D = new Array(30).fill(0);
+    // 12~14성은 파괴 0
+
     let cum12 = 0;
     for (let s = 12; s < 15; s++) {
       const pSuccess = STARFORCE_CONFIG.probTable[s][0];
@@ -2226,7 +2229,7 @@ class StarforceOptimizer {
       }
     }
 
-    for (let s = 15; s < targetStar; s++) {
+    for (let s = 15; s < 25; s++) {
       const baseProb = STARFORCE_CONFIG.probTable[s];
       const rawSuccess = baseProb[0];
       const rawDestroy = (isDestroyReduction && s <= 21) ? baseProb[2] * 0.7 : baseProb[2];
@@ -2245,21 +2248,26 @@ class StarforceOptimizer {
         const restoreInfo = getRestoreTotalCost({ level, star: s, spareCost: baseCost, event });
         const restoreLoss = restoreInfo ? restoreInfo.totalCost : Infinity;
         stepCost = (normalCost + rawDestroy * restoreLoss) / rawSuccess;
-        stepDest = rawDestroy / rawSuccess;
+        stepDest = (rawDestroy / rawSuccess) * (restoreInfo ? restoreInfo.spareCount : 1);
       } else {
         const rollbackLoss = baseCost + cum12;
         stepCost = (normalCost + rawDestroy * rollbackLoss) / rawSuccess;
-        stepDest = rawDestroy / rawSuccess;
+        // 12성 롤백 시 1회 파괴당 새 장비 1개 + 12성에서 s성까지 올라오는 누적 파괴 D[s] 추가 발생!
+        stepDest = (rawDestroy / rawSuccess) * (1 + D[s]);
       }
 
       cum12 += stepCost;
+      D[s + 1] = D[s] + stepDest;
 
-      if (s >= startStar) {
+      if (s >= startStar && s < targetStar) {
         totalCost += stepCost;
-        totalDestroys += stepDest;
         totalTrials += 1 / rawSuccess;
       }
     }
+
+    // 시작 성수에서 목표 성수까지의 실제 기대 파괴 장비 수
+    const startIdx = Math.max(12, startStar);
+    totalDestroys = (targetStar > startIdx) ? (D[targetStar] - D[startIdx]) : 0;
 
     return {
       expCost: totalCost,
