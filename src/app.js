@@ -14,7 +14,7 @@ const state = {
     event: '샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인)',
     autoOptimize: true,
     safeguard: { 15: true, 16: true, 17: true },
-    restoreMode: 'optimal', // 'optimal' (성수별 최대 효율 복구) | 'exact' | 'rollback12'
+    restoreMode: 'optimal', // 'optimal' (성수별 최대 효율 복구)
     mvpDiscount: 0,
     pcRoom: false
   },
@@ -24,11 +24,11 @@ const state = {
 
 // 로컬 스토리지 키
 const STORAGE_KEY_PRESETS = 'maple_sf_custom_presets_v2';
+let selectedPresetKey = '';
 
 /**
  * 메소 단위를 '~억 ~만 메소'로 포맷팅
  * @param {number} amount - 순수 메소 금액
- * @param {boolean} includeWon - 원화 환산 병기 여부
  */
 export function formatMeso(amount) {
   if (!amount || isNaN(amount) || amount === 0) return '0 메소';
@@ -64,8 +64,8 @@ export function formatManMeso(manVal) {
  */
 function getCalculatedOptions() {
   const ev = state.options.event === 'none' ? null : state.options.event;
-  const isAuto = state.options.autoOptimize;
-  const restoreMode = state.options.restoreMode;
+  const isAuto = true; // 상시 자동 최적화 (DP)
+  const restoreMode = 'optimal';
   const mvp = parseFloat(state.options.mvpDiscount);
   const pc = state.options.pcRoom;
 
@@ -73,21 +73,8 @@ function getCalculatedOptions() {
     event: ev,
     autoOptimize: isAuto,
     restoreMode: restoreMode,
-    safeguardRecord: {
-      15: !!state.options.safeguard[15],
-      16: !!state.options.safeguard[16],
-      17: !!state.options.safeguard[17]
-    },
-    restoreRecord: {
-      15: restoreMode === 'exact' || restoreMode === 'optimal',
-      16: restoreMode === 'exact' || restoreMode === 'optimal',
-      17: restoreMode === 'exact' || restoreMode === 'optimal',
-      18: restoreMode === 'exact' || restoreMode === 'optimal',
-      19: restoreMode === 'exact' || restoreMode === 'optimal',
-      20: restoreMode === 'exact' || restoreMode === 'optimal',
-      21: restoreMode === 'exact' || restoreMode === 'optimal',
-      22: restoreMode === 'exact' || restoreMode === 'optimal'
-    },
+    safeguardRecord: { 15: true, 16: true, 17: true },
+    restoreRecord: { 15: true, 16: true, 17: true, 18: true, 19: true, 20: true, 21: true, 22: true },
     mvpDiscount: mvp,
     pcRoom: pc
   };
@@ -522,14 +509,41 @@ function savePresetsToStorage(presets) {
   localStorage.setItem(STORAGE_KEY_PRESETS, JSON.stringify(presets));
 }
 
-function renderCustomPresetSelect() {
-  const sel = document.getElementById('selCustomPresets');
-  if (!sel) return;
+function renderCustomPresetDropdown() {
+  const menu = document.getElementById('menuPresets');
+  const triggerLabel = document.querySelector('#btnPresetTrigger .trigger-label');
+  if (!menu || !triggerLabel) return;
+
   const presets = getSavedPresets();
   const keys = Object.keys(presets);
 
-  sel.innerHTML = '<option value="">-- 저장된 프리셋 선택 --</option>' +
-    keys.map(k => `<option value="${k}">${k} (${presets[k].length}개 장비)</option>`).join('');
+  if (keys.length === 0) {
+    menu.innerHTML = '<div class="dropdown-option" style="color:#8b949e; cursor:default;">저장된 프리셋이 없습니다</div>';
+    triggerLabel.innerText = '-- 저장된 프리셋 선택 --';
+    selectedPresetKey = '';
+    return;
+  }
+
+  menu.innerHTML = keys.map(k => `
+    <div class="dropdown-option ${k === selectedPresetKey ? 'active' : ''}" data-key="${k}">
+      <span>${k}</span>
+      <small style="font-size:11px; color:#8b949e;">(${presets[k].length}부위)</small>
+    </div>
+  `).join('');
+
+  if (selectedPresetKey && presets[selectedPresetKey]) {
+    triggerLabel.innerText = `${selectedPresetKey} (${presets[selectedPresetKey].length}부위)`;
+  } else {
+    triggerLabel.innerText = '-- 저장된 프리셋 선택 --';
+  }
+
+  menu.querySelectorAll('.dropdown-option[data-key]').forEach(opt => {
+    opt.addEventListener('click', () => {
+      selectedPresetKey = opt.dataset.key;
+      renderCustomPresetDropdown();
+      document.getElementById('dropdownPresets').classList.remove('open');
+    });
+  });
 }
 
 /**
@@ -537,15 +551,45 @@ function renderCustomPresetSelect() {
  */
 let currentEditIdx = -1;
 
+function renderModalPresetDropdown() {
+  const menu = document.getElementById('menuModalPreset');
+  const triggerLabel = document.querySelector('#btnModalPresetTrigger .trigger-label');
+  if (!menu || !triggerLabel) return;
+
+  menu.innerHTML = '<div class="dropdown-option" data-id="">-- 직접 입력 --</div>' +
+    STARFORCE_CONFIG.itemPresets.map(p => `
+      <div class="dropdown-option" data-id="${p.id}">
+        <span>${p.name}</span>
+        <small style="font-size:11px; color:#8b949e;">(${p.level}제 · ${formatMeso(p.defaultBaseCost)})</small>
+      </div>
+    `).join('');
+
+  menu.querySelectorAll('.dropdown-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const pId = opt.dataset.id;
+      const preset = STARFORCE_CONFIG.itemPresets.find(p => p.id === pId);
+      if (preset) {
+        triggerLabel.innerText = preset.name;
+        document.getElementById('inputItemName').value = preset.name;
+        document.getElementById('inputItemLevel').value = preset.level;
+        const manCost = Math.round(preset.defaultBaseCost / 10000);
+        document.getElementById('inputBaseCost').value = manCost;
+        document.getElementById('baseCostFormatted').innerText = formatManMeso(manCost);
+      } else {
+        triggerLabel.innerText = '-- 직접 입력 --';
+      }
+      document.getElementById('dropdownModalPreset').classList.remove('open');
+    });
+  });
+}
+
 function openItemModal(editIdx = -1) {
   currentEditIdx = editIdx;
   const modal = document.getElementById('itemModal');
   const title = document.getElementById('modalTitle');
-  const presetSelect = document.getElementById('inputItemPreset');
+  const triggerLabel = document.querySelector('#btnModalPresetTrigger .trigger-label');
 
-  // 프리셋 채우기
-  presetSelect.innerHTML = '<option value="">-- 직접 입력 --</option>' + 
-    STARFORCE_CONFIG.itemPresets.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  renderModalPresetDropdown();
 
   if (editIdx >= 0) {
     title.innerText = '강화 장비 수정';
@@ -554,20 +598,21 @@ function openItemModal(editIdx = -1) {
     document.getElementById('inputItemLevel').value = it.level;
     document.getElementById('inputStartStar').value = it.startStar;
     document.getElementById('inputTargetStar').value = it.targetStar;
-    // 만 메소 단위로 표시 (baseCost / 10000)
     const baseCostInMan = Math.round(it.baseCost / 10000);
     document.getElementById('inputBaseCost').value = baseCostInMan;
     document.getElementById('inputItemCount').value = it.count || 1;
     document.getElementById('baseCostFormatted').innerText = formatManMeso(baseCostInMan);
+    if (triggerLabel) triggerLabel.innerText = it.name;
   } else {
     title.innerText = '새 강화 장비 추가';
     document.getElementById('itemForm').reset();
     document.getElementById('inputItemLevel').value = 200;
     document.getElementById('inputStartStar').value = 0;
     document.getElementById('inputTargetStar').value = 22;
-    document.getElementById('inputBaseCost').value = 400000; // 40억 = 400,000만 메소
+    document.getElementById('inputBaseCost').value = 400000;
     document.getElementById('inputItemCount').value = 1;
     document.getElementById('baseCostFormatted').innerText = formatManMeso(400000);
+    if (triggerLabel) triggerLabel.innerText = '-- 직접 입력 --';
   }
 
   modal.classList.add('active');
@@ -578,28 +623,101 @@ function closeItemModal() {
 }
 
 /**
- * 이벤트 리스너 등록
+ * 커스텀 드롭다운 전역 이벤트 설정
  */
-function initEvents() {
-  // 이벤트 선택 셀렉트 박스
-  const selEvent = document.getElementById('selEvent');
-  if (selEvent) {
-    selEvent.addEventListener('change', (e) => {
-      state.options.event = e.target.value;
-      runAnalysis();
+function setupCustomDropdowns() {
+  // 1. MVP 드롭다운
+  const ddMvp = document.getElementById('dropdownMvp');
+  const btnMvp = document.getElementById('btnMvpTrigger');
+  const menuMvp = document.getElementById('menuMvp');
+  const labelMvp = btnMvp.querySelector('.trigger-label');
+
+  if (btnMvp) {
+    btnMvp.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAllDropdowns(ddMvp);
+      ddMvp.classList.toggle('open');
     });
   }
 
-  // MVP & PC방
-  document.getElementById('selMvp').addEventListener('change', (e) => {
-    state.options.mvpDiscount = e.target.value;
-    runAnalysis();
+  if (menuMvp) {
+    menuMvp.querySelectorAll('.dropdown-option').forEach(opt => {
+      opt.addEventListener('click', () => {
+        const val = parseFloat(opt.dataset.value);
+        state.options.mvpDiscount = val;
+        labelMvp.innerText = opt.innerText;
+        menuMvp.querySelectorAll('.dropdown-option').forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+        ddMvp.classList.remove('open');
+        runAnalysis();
+      });
+    });
+  }
+
+  // 2. 프리셋 드롭다운
+  const ddPresets = document.getElementById('dropdownPresets');
+  const btnPresets = document.getElementById('btnPresetTrigger');
+  if (btnPresets) {
+    btnPresets.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAllDropdowns(ddPresets);
+      ddPresets.classList.toggle('open');
+    });
+  }
+
+  // 3. 모달 프리셋 드롭다운
+  const ddModal = document.getElementById('dropdownModalPreset');
+  const btnModal = document.getElementById('btnModalPresetTrigger');
+  if (btnModal) {
+    btnModal.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeAllDropdowns(ddModal);
+      ddModal.classList.toggle('open');
+    });
+  }
+
+  // 외부 클릭 시 모든 드롭다운 닫기
+  document.addEventListener('click', () => closeAllDropdowns());
+}
+
+function closeAllDropdowns(exceptElement = null) {
+  document.querySelectorAll('.custom-dropdown').forEach(dd => {
+    if (dd !== exceptElement) {
+      dd.classList.remove('open');
+    }
+  });
+}
+
+/**
+ * 이벤트 리스너 등록
+ */
+function initEvents() {
+  setupCustomDropdowns();
+
+  // 이벤트 세그먼트 토글 버튼 (일반 vs 샤이닝 스타포스)
+  const segButtons = document.querySelectorAll('#eventSegmentedControl .segment-btn');
+  segButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      segButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const val = btn.dataset.value;
+      if (val === 'shining') {
+        state.options.event = '샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인)';
+      } else {
+        state.options.event = 'none';
+      }
+      runAnalysis();
+    });
   });
 
-  document.getElementById('chkPcRoom').addEventListener('change', (e) => {
-    state.options.pcRoom = e.target.checked;
-    runAnalysis();
-  });
+  // PC방 할인 토글
+  const chkPc = document.getElementById('chkPcRoom');
+  if (chkPc) {
+    chkPc.addEventListener('change', (e) => {
+      state.options.pcRoom = e.target.checked;
+      runAnalysis();
+    });
+  }
 
   // 1. 커스텀 프리셋 저장 버튼
   document.getElementById('btnSaveCustomPreset').addEventListener('click', () => {
@@ -613,37 +731,36 @@ function initEvents() {
     const presets = getSavedPresets();
     presets[presetName.trim()] = JSON.parse(JSON.stringify(state.items));
     savePresetsToStorage(presets);
-    renderCustomPresetSelect();
-    document.getElementById('selCustomPresets').value = presetName.trim();
+    selectedPresetKey = presetName.trim();
+    renderCustomPresetDropdown();
     alert(`'${presetName.trim()}' 프리셋이 저장되었습니다!`);
   });
 
   // 2. 커스텀 프리셋 불러오기 버튼
   document.getElementById('btnLoadCustomPreset').addEventListener('click', () => {
-    const selectedKey = document.getElementById('selCustomPresets').value;
-    if (!selectedKey) {
+    if (!selectedPresetKey) {
       alert('불러올 프리셋을 먼저 선택하세요.');
       return;
     }
     const presets = getSavedPresets();
-    if (presets[selectedKey]) {
-      state.items = JSON.parse(JSON.stringify(presets[selectedKey]));
+    if (presets[selectedPresetKey]) {
+      state.items = JSON.parse(JSON.stringify(presets[selectedPresetKey]));
       runAnalysis();
     }
   });
 
   // 3. 커스텀 프리셋 삭제 버튼
   document.getElementById('btnDeleteCustomPreset').addEventListener('click', () => {
-    const selectedKey = document.getElementById('selCustomPresets').value;
-    if (!selectedKey) {
+    if (!selectedPresetKey) {
       alert('삭제할 프리셋을 선택하세요.');
       return;
     }
-    if (confirm(`'${selectedKey}' 프리셋을 정말 삭제하시겠습니까?`)) {
+    if (confirm(`'${selectedPresetKey}' 프리셋을 정말 삭제하시겠습니까?`)) {
       const presets = getSavedPresets();
-      delete presets[selectedKey];
+      delete presets[selectedPresetKey];
       savePresetsToStorage(presets);
-      renderCustomPresetSelect();
+      selectedPresetKey = '';
+      renderCustomPresetDropdown();
     }
   });
 
@@ -659,19 +776,6 @@ function initEvents() {
   document.getElementById('btnCloseModal').addEventListener('click', closeItemModal);
   document.getElementById('btnCancelModal').addEventListener('click', closeItemModal);
 
-  // 모달 내 프리셋 변경 시 자동 입력 (만 메소 단위로 변환)
-  document.getElementById('inputItemPreset').addEventListener('change', (e) => {
-    const pId = e.target.value;
-    const preset = STARFORCE_CONFIG.itemPresets.find(p => p.id === pId);
-    if (preset) {
-      document.getElementById('inputItemName').value = preset.name;
-      document.getElementById('inputItemLevel').value = preset.level;
-      const manCost = Math.round(preset.defaultBaseCost / 10000);
-      document.getElementById('inputBaseCost').value = manCost;
-      document.getElementById('baseCostFormatted').innerText = formatManMeso(manCost);
-    }
-  });
-
   // 노작 비용 실시간 포맷 표시 (만 메소 단위 입력 -> 한글 포맷팅)
   document.getElementById('inputBaseCost').addEventListener('input', (e) => {
     const manVal = parseFloat(e.target.value) || 0;
@@ -682,7 +786,7 @@ function initEvents() {
   document.getElementById('itemForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const manVal = parseFloat(document.getElementById('inputBaseCost').value) || 0;
-    const baseCostInMeso = manVal * 10000; // 만 메소 -> 순수 메소로 변환
+    const baseCostInMeso = manVal * 10000;
 
     const itemData = {
       id: 'item_' + Date.now(),
@@ -721,8 +825,8 @@ function initEvents() {
       }
 
       let report = `📊 [메이플 스타포스 강화 분석 리포트]\n`;
-      report += `• 적용 이벤트: ${calculatedOptions.event || '없음'}\n`;
-      report += `• 자동 최적화(DP): ${calculatedOptions.autoOptimize ? 'ON (최소 비용 최적화)' : 'OFF'}\n`;
+      report += `• 적용 이벤트: ${calculatedOptions.event || '일반 (없음)'}\n`;
+      report += `• 자동 최적화(DP): ON (최소 비용 최적화)\n`;
       report += `• 총 기대 비용: ${formatMeso(result.totalExpCost)}\n`;
       report += `• 중앙값(50%): ${formatMeso(result.percentiles.p50)}\n`;
       report += `• 상위 10%(대박): ${formatMeso(result.percentiles.p10)}\n`;
@@ -849,7 +953,7 @@ function initEvents() {
 
 // 초기화
 window.addEventListener('DOMContentLoaded', () => {
-  renderCustomPresetSelect();
+  renderCustomPresetDropdown();
   initEvents();
   runAnalysis();
 });
