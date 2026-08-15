@@ -225,6 +225,9 @@ body {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-sub);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .option-row-double {
@@ -232,6 +235,102 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 14px;
   align-items: center;
+}
+
+/* Modern Custom Select Box */
+.select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.modern-select {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(13, 17, 23, 0.85);
+  border: 1px solid rgba(56, 139, 253, 0.3);
+  color: #f0f6fc;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 10px 36px 10px 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.modern-select:hover {
+  border-color: var(--primary);
+  background: rgba(22, 27, 34, 0.95);
+  box-shadow: 0 0 12px rgba(56, 139, 253, 0.2);
+}
+
+.modern-select:focus {
+  border-color: var(--primary-hover);
+  box-shadow: 0 0 0 3px rgba(56, 139, 253, 0.25);
+  background: #161b22;
+}
+
+.modern-select option {
+  background: #161b22;
+  color: #f0f6fc;
+  padding: 10px;
+  font-size: 13px;
+}
+
+.select-arrow {
+  position: absolute;
+  right: 14px;
+  pointer-events: none;
+  color: var(--primary);
+  font-size: 11px;
+  transition: transform 0.2s ease;
+}
+
+/* Optimization Status Banner */
+.optimization-status-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: linear-gradient(135deg, rgba(56, 139, 253, 0.12), rgba(241, 224, 90, 0.08));
+  border: 1px solid rgba(56, 139, 253, 0.3);
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  margin-top: 4px;
+}
+
+.banner-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(241, 224, 90, 0.2);
+  color: var(--accent-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.banner-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #f0f6fc;
+  margin-bottom: 2px;
+}
+
+.banner-desc {
+  font-size: 11px;
+  line-height: 1.45;
+  color: #8b949e;
+}
+
+.banner-desc strong {
+  color: var(--primary-hover);
 }
 
 /* Radio Group */
@@ -1150,78 +1249,54 @@ body {
           
           <div class="options-grid">
             <div class="option-item">
-              <label class="option-label">스타포스 이벤트 선택</label>
-              <select id="selEvent" class="custom-select">
-                <option value="샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인)" selected>
-                  샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인)
-                </option>
-                <option value="none">이벤트 없음</option>
-              </select>
-            </div>
-
-            <!-- 강화 자동 최적화 토글 (starforce.gg 알고리즘) -->
-            <div class="option-item highlight-option">
-              <div class="option-header-flex">
-                <label class="option-label"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent-gold);"></i> 강화 경로 자동 최적화 (DP)</label>
-                <span class="badge" style="background:rgba(241,224,90,0.15); color:var(--accent-gold); font-size:10px;">starforce.gg</span>
-              </div>
-              <div class="toggle-switch">
-                <input type="checkbox" id="chkAutoOptimize" checked>
-                <label for="chkAutoOptimize" class="toggle-slider"></label>
-                <span class="toggle-text" id="lblAutoOptimize">최적 파방 & 복구 자동 탐색 (ON)</span>
-              </div>
-            </div>
-
-            <!-- 파괴 방지 개별 성수 설정 -->
-            <div class="option-item">
-              <label class="option-label">파괴 방지 설정 (성수별 ON/OFF)</label>
-              <div class="checkbox-button-group">
-                <label class="check-btn">
-                  <input type="checkbox" id="chkSafeguard15" checked> 15성 (+200%)
-                </label>
-                <label class="check-btn">
-                  <input type="checkbox" id="chkSafeguard16" checked> 16성 (+200%)
-                </label>
-                <label class="check-btn">
-                  <input type="checkbox" id="chkSafeguard17" checked> 17성 (+200%)
-                </label>
-              </div>
-            </div>
-
-            <!-- 흔적 복구 방식 설정 (성수별 최대 효율 복구 지원) -->
-            <div class="option-item">
-              <label class="option-label">파괴 시 복구 방식</label>
-              <div class="radio-group" id="restoreModeRadioGroup">
-                <label class="radio-btn active" title="각 성수마다 직전 성수 복구와 12성 롤백 중 손익분기점을 따져 최소 비용이 되는 방식 자동 채택">
-                  <input type="radio" name="restoreMode" value="optimal" checked> 성수별 최대 효율 복구
-                </label>
-                <label class="radio-btn">
-                  <input type="radio" name="restoreMode" value="exact"> 직전 성수 복구 (메소+스페어)
-                </label>
-                <label class="radio-btn">
-                  <input type="radio" name="restoreMode" value="rollback12"> 12성 롤백 복구 (스페어만)
-                </label>
+              <label class="option-label" for="selEvent">
+                <i class="fa-solid fa-calendar-star" style="color:var(--accent-gold);"></i> 스타포스 이벤트 선택
+              </label>
+              <div class="select-wrapper">
+                <select id="selEvent" class="custom-select modern-select">
+                  <option value="샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인)" selected>
+                    🌟 샤이닝 스타포스 (비용 30% 할인 · 21성↓ 파괴 30% 감소 · 흔적 복구 메소 20% 할인)
+                  </option>
+                  <option value="none">⚪ 이벤트 없음</option>
+                </select>
+                <i class="fa-solid fa-chevron-down select-arrow"></i>
               </div>
             </div>
 
             <div class="option-row-double">
               <div class="option-item">
-                <label class="option-label" for="selMvp">MVP 등급</label>
-                <select id="selMvp" class="custom-select">
-                  <option value="0">일반 (0%)</option>
-                  <option value="0.03">실버 (3%)</option>
-                  <option value="0.05">골드 (5%)</option>
-                  <option value="0.10">다이아/레드 (10%)</option>
-                </select>
+                <label class="option-label" for="selMvp">
+                  <i class="fa-solid fa-gem" style="color:#58a6ff;"></i> MVP 등급
+                </label>
+                <div class="select-wrapper">
+                  <select id="selMvp" class="custom-select modern-select">
+                    <option value="0">일반 (0%)</option>
+                    <option value="0.03">실버 (3%)</option>
+                    <option value="0.05">골드 (5%)</option>
+                    <option value="0.10">다이아 / 레드 (10%)</option>
+                  </select>
+                  <i class="fa-solid fa-chevron-down select-arrow"></i>
+                </div>
               </div>
 
               <div class="option-item">
-                <label class="option-label" for="chkPcRoom">PC방 혜택</label>
+                <label class="option-label" for="chkPcRoom">
+                  <i class="fa-solid fa-desktop" style="color:#56d364;"></i> PC방 혜택
+                </label>
                 <div class="toggle-switch small">
                   <input type="checkbox" id="chkPcRoom">
                   <label for="chkPcRoom" class="toggle-slider"></label>
                   <span class="toggle-text">5% 할인</span>
                 </div>
+              </div>
+            </div>
+
+            <!-- 상시 자동 최적화 안내 배지 -->
+            <div class="optimization-status-banner">
+              <div class="banner-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+              <div class="banner-content">
+                <div class="banner-title">강화 경로 자동 최적화 (DP) 상시 활성화</div>
+                <div class="banner-desc">장비 노작 가격과 레벨에 맞춰 <strong>최소 비용 파괴방지 및 성수별 최적 복구(직전 성수 vs 12성 롤백)</strong>가 자동으로 계산되어 적용됩니다.</div>
               </div>
             </div>
           </div>
@@ -2910,38 +2985,6 @@ function initEvents() {
       runAnalysis();
     });
   }
-
-  // 강화 자동 최적화 토글 (starforce.gg)
-  const chkAuto = document.getElementById('chkAutoOptimize');
-  const lblAuto = document.getElementById('lblAutoOptimize');
-  if (chkAuto) {
-    chkAuto.addEventListener('change', (e) => {
-      state.options.autoOptimize = e.target.checked;
-      lblAuto.innerText = e.target.checked ? '최적 파방 & 복구 자동 탐색 (ON)' : '수동 설정 모드 (OFF)';
-      runAnalysis();
-    });
-  }
-
-  // 파괴 방지 성수별 체크박스 (15, 16, 17성)
-  [15, 16, 17].forEach(star => {
-    const chk = document.getElementById(`chkSafeguard${star}`);
-    if (chk) {
-      chk.addEventListener('change', (e) => {
-        state.options.safeguard[star] = e.target.checked;
-        runAnalysis();
-      });
-    }
-  });
-
-  // 복구 방식 라디오 (optimal, exact, rollback12)
-  document.querySelectorAll('input[name="restoreMode"]').forEach(radio => {
-    radio.addEventListener('change', (e) => {
-      document.querySelectorAll('#restoreModeRadioGroup .radio-btn').forEach(btn => btn.classList.remove('active'));
-      e.target.closest('.radio-btn').classList.add('active');
-      state.options.restoreMode = e.target.value;
-      runAnalysis();
-    });
-  });
 
   // MVP & PC방
   document.getElementById('selMvp').addEventListener('change', (e) => {

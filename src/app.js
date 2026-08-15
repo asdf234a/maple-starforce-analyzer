@@ -590,38 +590,6 @@ function initEvents() {
     });
   }
 
-  // 강화 자동 최적화 토글 (starforce.gg)
-  const chkAuto = document.getElementById('chkAutoOptimize');
-  const lblAuto = document.getElementById('lblAutoOptimize');
-  if (chkAuto) {
-    chkAuto.addEventListener('change', (e) => {
-      state.options.autoOptimize = e.target.checked;
-      lblAuto.innerText = e.target.checked ? '최적 파방 & 복구 자동 탐색 (ON)' : '수동 설정 모드 (OFF)';
-      runAnalysis();
-    });
-  }
-
-  // 파괴 방지 성수별 체크박스 (15, 16, 17성)
-  [15, 16, 17].forEach(star => {
-    const chk = document.getElementById(`chkSafeguard${star}`);
-    if (chk) {
-      chk.addEventListener('change', (e) => {
-        state.options.safeguard[star] = e.target.checked;
-        runAnalysis();
-      });
-    }
-  });
-
-  // 복구 방식 라디오 (optimal, exact, rollback12)
-  document.querySelectorAll('input[name="restoreMode"]').forEach(radio => {
-    radio.addEventListener('change', (e) => {
-      document.querySelectorAll('#restoreModeRadioGroup .radio-btn').forEach(btn => btn.classList.remove('active'));
-      e.target.closest('.radio-btn').classList.add('active');
-      state.options.restoreMode = e.target.value;
-      runAnalysis();
-    });
-  });
-
   // MVP & PC방
   document.getElementById('selMvp').addEventListener('change', (e) => {
     state.options.mvpDiscount = e.target.value;
