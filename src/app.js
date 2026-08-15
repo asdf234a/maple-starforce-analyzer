@@ -24,7 +24,6 @@ const state = {
 
 // 로컬 스토리지 키
 const STORAGE_KEY_PRESETS = 'maple_sf_custom_presets_v2';
-let selectedPresetKey = '';
 
 /**
  * 메소 단위를 '~억 ~만 메소'로 포맷팅
@@ -60,7 +59,7 @@ export function formatManMeso(manVal) {
 }
 
 /**
- * 전역 옵션 객체 가공 (성수별 독립 복구 최적화 지원)
+ * 전역 옵션 객체 가공
  */
 function getCalculatedOptions() {
   const ev = state.options.event === 'none' ? null : state.options.event;
@@ -494,7 +493,7 @@ function renderTables(result) {
 }
 
 /**
- * 커스텀 프리셋 저장/불러오기/삭제 관리
+ * 커스텀 프리셋 저장/불러오기/삭제 관리 (태그 칩 UI)
  */
 function getSavedPresets() {
   try {
@@ -509,76 +508,80 @@ function savePresetsToStorage(presets) {
   localStorage.setItem(STORAGE_KEY_PRESETS, JSON.stringify(presets));
 }
 
-function renderCustomPresetDropdown() {
-  const menu = document.getElementById('menuPresets');
-  const triggerLabel = document.querySelector('#btnPresetTrigger .trigger-label');
-  if (!menu || !triggerLabel) return;
+function renderCustomPresetChips() {
+  const container = document.getElementById('presetChipsContainer');
+  if (!container) return;
 
   const presets = getSavedPresets();
   const keys = Object.keys(presets);
 
   if (keys.length === 0) {
-    menu.innerHTML = '<div class="dropdown-option" style="color:#8b949e; cursor:default;">저장된 프리셋이 없습니다</div>';
-    triggerLabel.innerText = '-- 저장된 프리셋 선택 --';
-    selectedPresetKey = '';
+    container.innerHTML = '<span class="preset-empty-msg">저장된 프리셋이 없습니다. 장비를 구성한 후 [+ 현재 목록 저장]을 눌러보세요.</span>';
     return;
   }
 
-  menu.innerHTML = keys.map(k => `
-    <div class="dropdown-option ${k === selectedPresetKey ? 'active' : ''}" data-key="${k}">
+  container.innerHTML = keys.map(k => `
+    <div class="preset-chip" data-key="${k}" title="클릭 시 이 프리셋을 불러옵니다">
       <span>${k}</span>
-      <small style="font-size:11px; color:#8b949e;">(${presets[k].length}부위)</small>
+      <span class="chip-count">${presets[k].length}부위</span>
+      <i class="fa-solid fa-xmark chip-delete" data-del-key="${k}" title="프리셋 삭제"></i>
     </div>
   `).join('');
 
-  if (selectedPresetKey && presets[selectedPresetKey]) {
-    triggerLabel.innerText = `${selectedPresetKey} (${presets[selectedPresetKey].length}부위)`;
-  } else {
-    triggerLabel.innerText = '-- 저장된 프리셋 선택 --';
-  }
+  // 칩 클릭 시 불러오기
+  container.querySelectorAll('.preset-chip').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      if (e.target.classList.contains('chip-delete')) return;
+      const k = chip.dataset.key;
+      const presets = getSavedPresets();
+      if (presets[k]) {
+        state.items = JSON.parse(JSON.stringify(presets[k]));
+        runAnalysis();
+      }
+    });
+  });
 
-  menu.querySelectorAll('.dropdown-option[data-key]').forEach(opt => {
-    opt.addEventListener('click', () => {
-      selectedPresetKey = opt.dataset.key;
-      renderCustomPresetDropdown();
-      document.getElementById('dropdownPresets').classList.remove('open');
+  // 칩 삭제 버튼
+  container.querySelectorAll('.chip-delete').forEach(delBtn => {
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const k = delBtn.dataset.delKey;
+      if (confirm(`'${k}' 프리셋을 삭제하시겠습니까?`)) {
+        const presets = getSavedPresets();
+        delete presets[k];
+        savePresetsToStorage(presets);
+        renderCustomPresetChips();
+      }
     });
   });
 }
 
 /**
- * 모달 열기/닫기
+ * 모달 열기/닫기 & 빠른 템플릿 칩 렌더링
  */
 let currentEditIdx = -1;
 
-function renderModalPresetDropdown() {
-  const menu = document.getElementById('menuModalPreset');
-  const triggerLabel = document.querySelector('#btnModalPresetTrigger .trigger-label');
-  if (!menu || !triggerLabel) return;
+function renderModalTemplateChips() {
+  const container = document.getElementById('modalTemplateChips');
+  if (!container) return;
 
-  menu.innerHTML = '<div class="dropdown-option" data-id="">-- 직접 입력 --</div>' +
-    STARFORCE_CONFIG.itemPresets.map(p => `
-      <div class="dropdown-option" data-id="${p.id}">
-        <span>${p.name}</span>
-        <small style="font-size:11px; color:#8b949e;">(${p.level}제 · ${formatMeso(p.defaultBaseCost)})</small>
-      </div>
-    `).join('');
+  container.innerHTML = STARFORCE_CONFIG.itemPresets.map(p => `
+    <button type="button" class="template-chip" data-id="${p.id}">
+      ${p.name} (${p.level}제)
+    </button>
+  `).join('');
 
-  menu.querySelectorAll('.dropdown-option').forEach(opt => {
-    opt.addEventListener('click', () => {
-      const pId = opt.dataset.id;
+  container.querySelectorAll('.template-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const pId = chip.dataset.id;
       const preset = STARFORCE_CONFIG.itemPresets.find(p => p.id === pId);
       if (preset) {
-        triggerLabel.innerText = preset.name;
         document.getElementById('inputItemName').value = preset.name;
         document.getElementById('inputItemLevel').value = preset.level;
         const manCost = Math.round(preset.defaultBaseCost / 10000);
         document.getElementById('inputBaseCost').value = manCost;
         document.getElementById('baseCostFormatted').innerText = formatManMeso(manCost);
-      } else {
-        triggerLabel.innerText = '-- 직접 입력 --';
       }
-      document.getElementById('dropdownModalPreset').classList.remove('open');
     });
   });
 }
@@ -587,9 +590,8 @@ function openItemModal(editIdx = -1) {
   currentEditIdx = editIdx;
   const modal = document.getElementById('itemModal');
   const title = document.getElementById('modalTitle');
-  const triggerLabel = document.querySelector('#btnModalPresetTrigger .trigger-label');
 
-  renderModalPresetDropdown();
+  renderModalTemplateChips();
 
   if (editIdx >= 0) {
     title.innerText = '강화 장비 수정';
@@ -602,7 +604,6 @@ function openItemModal(editIdx = -1) {
     document.getElementById('inputBaseCost').value = baseCostInMan;
     document.getElementById('inputItemCount').value = it.count || 1;
     document.getElementById('baseCostFormatted').innerText = formatManMeso(baseCostInMan);
-    if (triggerLabel) triggerLabel.innerText = it.name;
   } else {
     title.innerText = '새 강화 장비 추가';
     document.getElementById('itemForm').reset();
@@ -612,7 +613,6 @@ function openItemModal(editIdx = -1) {
     document.getElementById('inputBaseCost').value = 400000;
     document.getElementById('inputItemCount').value = 1;
     document.getElementById('baseCostFormatted').innerText = formatManMeso(400000);
-    if (triggerLabel) triggerLabel.innerText = '-- 직접 입력 --';
   }
 
   modal.classList.add('active');
@@ -623,94 +623,33 @@ function closeItemModal() {
 }
 
 /**
- * 커스텀 드롭다운 전역 이벤트 설정
- */
-function setupCustomDropdowns() {
-  // 1. MVP 드롭다운
-  const ddMvp = document.getElementById('dropdownMvp');
-  const btnMvp = document.getElementById('btnMvpTrigger');
-  const menuMvp = document.getElementById('menuMvp');
-  const labelMvp = btnMvp.querySelector('.trigger-label');
-
-  if (btnMvp) {
-    btnMvp.addEventListener('click', (e) => {
-      e.stopPropagation();
-      closeAllDropdowns(ddMvp);
-      ddMvp.classList.toggle('open');
-    });
-  }
-
-  if (menuMvp) {
-    menuMvp.querySelectorAll('.dropdown-option').forEach(opt => {
-      opt.addEventListener('click', () => {
-        const val = parseFloat(opt.dataset.value);
-        state.options.mvpDiscount = val;
-        labelMvp.innerText = opt.innerText;
-        menuMvp.querySelectorAll('.dropdown-option').forEach(o => o.classList.remove('active'));
-        opt.classList.add('active');
-        ddMvp.classList.remove('open');
-        runAnalysis();
-      });
-    });
-  }
-
-  // 2. 프리셋 드롭다운
-  const ddPresets = document.getElementById('dropdownPresets');
-  const btnPresets = document.getElementById('btnPresetTrigger');
-  if (btnPresets) {
-    btnPresets.addEventListener('click', (e) => {
-      e.stopPropagation();
-      closeAllDropdowns(ddPresets);
-      ddPresets.classList.toggle('open');
-    });
-  }
-
-  // 3. 모달 프리셋 드롭다운
-  const ddModal = document.getElementById('dropdownModalPreset');
-  const btnModal = document.getElementById('btnModalPresetTrigger');
-  if (btnModal) {
-    btnModal.addEventListener('click', (e) => {
-      e.stopPropagation();
-      closeAllDropdowns(ddModal);
-      ddModal.classList.toggle('open');
-    });
-  }
-
-  // 외부 클릭 시 모든 드롭다운 닫기
-  document.addEventListener('click', () => closeAllDropdowns());
-}
-
-function closeAllDropdowns(exceptElement = null) {
-  document.querySelectorAll('.custom-dropdown').forEach(dd => {
-    if (dd !== exceptElement) {
-      dd.classList.remove('open');
-    }
-  });
-}
-
-/**
  * 이벤트 리스너 등록
  */
 function initEvents() {
-  setupCustomDropdowns();
-
-  // 이벤트 세그먼트 토글 버튼 (일반 vs 샤이닝 스타포스)
-  const segButtons = document.querySelectorAll('#eventSegmentedControl .segment-btn');
-  segButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      segButtons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const val = btn.dataset.value;
-      if (val === 'shining') {
+  // 1. 샤이닝 스타포스 ON/OFF 토글 스위치
+  const chkShining = document.getElementById('chkShiningEvent');
+  if (chkShining) {
+    chkShining.addEventListener('change', (e) => {
+      if (e.target.checked) {
         state.options.event = '샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인)';
       } else {
         state.options.event = 'none';
       }
       runAnalysis();
     });
+  }
+
+  // 2. MVP 등급 알약형 버튼 그룹
+  document.querySelectorAll('#mvpButtonGroup .pill-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#mvpButtonGroup .pill-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.options.mvpDiscount = parseFloat(btn.dataset.value) || 0;
+      runAnalysis();
+    });
   });
 
-  // PC방 할인 토글
+  // 3. PC방 할인 토글
   const chkPc = document.getElementById('chkPcRoom');
   if (chkPc) {
     chkPc.addEventListener('change', (e) => {
@@ -719,7 +658,7 @@ function initEvents() {
     });
   }
 
-  // 1. 커스텀 프리셋 저장 버튼
+  // 4. 커스텀 프리셋 저장 버튼
   document.getElementById('btnSaveCustomPreset').addEventListener('click', () => {
     if (state.items.length === 0) {
       alert('저장할 장비 목록이 비어 있습니다. 먼저 장비를 추가하세요.');
@@ -731,40 +670,11 @@ function initEvents() {
     const presets = getSavedPresets();
     presets[presetName.trim()] = JSON.parse(JSON.stringify(state.items));
     savePresetsToStorage(presets);
-    selectedPresetKey = presetName.trim();
-    renderCustomPresetDropdown();
+    renderCustomPresetChips();
     alert(`'${presetName.trim()}' 프리셋이 저장되었습니다!`);
   });
 
-  // 2. 커스텀 프리셋 불러오기 버튼
-  document.getElementById('btnLoadCustomPreset').addEventListener('click', () => {
-    if (!selectedPresetKey) {
-      alert('불러올 프리셋을 먼저 선택하세요.');
-      return;
-    }
-    const presets = getSavedPresets();
-    if (presets[selectedPresetKey]) {
-      state.items = JSON.parse(JSON.stringify(presets[selectedPresetKey]));
-      runAnalysis();
-    }
-  });
-
-  // 3. 커스텀 프리셋 삭제 버튼
-  document.getElementById('btnDeleteCustomPreset').addEventListener('click', () => {
-    if (!selectedPresetKey) {
-      alert('삭제할 프리셋을 선택하세요.');
-      return;
-    }
-    if (confirm(`'${selectedPresetKey}' 프리셋을 정말 삭제하시겠습니까?`)) {
-      const presets = getSavedPresets();
-      delete presets[selectedPresetKey];
-      savePresetsToStorage(presets);
-      selectedPresetKey = '';
-      renderCustomPresetDropdown();
-    }
-  });
-
-  // 전체 비우기 & 추가 모달
+  // 5. 전체 비우기 & 추가 모달
   document.getElementById('btnClearItems').addEventListener('click', () => {
     if (confirm('등록된 모든 장비를 목록에서 비우시겠습니까?')) {
       state.items = [];
@@ -825,7 +735,7 @@ function initEvents() {
       }
 
       let report = `📊 [메이플 스타포스 강화 분석 리포트]\n`;
-      report += `• 적용 이벤트: ${calculatedOptions.event || '일반 (없음)'}\n`;
+      report += `• 적용 이벤트: ${calculatedOptions.event ? '샤이닝 스타포스' : '일반 (없음)'}\n`;
       report += `• 자동 최적화(DP): ON (최소 비용 최적화)\n`;
       report += `• 총 기대 비용: ${formatMeso(result.totalExpCost)}\n`;
       report += `• 중앙값(50%): ${formatMeso(result.percentiles.p50)}\n`;
@@ -953,7 +863,7 @@ function initEvents() {
 
 // 초기화
 window.addEventListener('DOMContentLoaded', () => {
-  renderCustomPresetDropdown();
+  renderCustomPresetChips();
   initEvents();
   runAnalysis();
 });

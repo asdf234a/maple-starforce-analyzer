@@ -237,185 +237,180 @@ body {
   align-items: center;
 }
 
-/* Segmented Control for Events */
-.segmented-control {
+/* Event Toggle Card (샤이닝 스타포스 ON/OFF) */
+.event-toggle-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, rgba(241, 224, 90, 0.08), rgba(56, 139, 253, 0.08));
+  border: 1px solid rgba(241, 224, 90, 0.25);
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+}
+
+.event-toggle-card:has(input:checked) {
+  background: linear-gradient(135deg, rgba(241, 224, 90, 0.15), rgba(56, 139, 253, 0.15));
+  border-color: rgba(241, 224, 90, 0.5);
+  box-shadow: 0 0 15px rgba(241, 224, 90, 0.1);
+}
+
+.event-toggle-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #f0f6fc;
+  margin-bottom: 3px;
+}
+
+.event-toggle-desc {
+  font-size: 11px;
+  color: #8b949e;
+  line-height: 1.35;
+}
+
+.event-toggle-card:has(input:checked) .event-toggle-title {
+  color: var(--accent-gold);
+}
+
+/* Pill Button Group (MVP 등급) */
+.pill-button-group {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
   background: var(--bg-input);
-  padding: 5px;
+  padding: 4px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
 }
 
-.segment-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 10px 8px;
+.pill-btn {
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 4px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.15s ease;
   text-align: center;
 }
 
-.segment-btn span {
-  font-size: 12.5px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.segment-btn small {
-  font-size: 10px;
-  color: #8b949e;
-  font-weight: 500;
-}
-
-.segment-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
+.pill-btn:hover {
   color: var(--text-main);
+  background: rgba(255, 255, 255, 0.04);
 }
 
-.segment-btn.active {
-  background: rgba(56, 139, 253, 0.18);
+.pill-btn.active {
+  background: rgba(56, 139, 253, 0.2);
   border-color: rgba(56, 139, 253, 0.4);
-  color: #f0f6fc;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.segment-btn.active small {
   color: #58a6ff;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
-.segment-btn[data-value="shining"].active {
-  background: linear-gradient(135deg, rgba(241, 224, 90, 0.15), rgba(56, 139, 253, 0.15));
-  border-color: rgba(241, 224, 90, 0.4);
-  color: #f0f6fc;
-}
-
-.segment-btn[data-value="shining"].active small {
-  color: var(--accent-gold);
-}
-
-/* Custom Dropdown Component */
-.custom-dropdown {
-  position: relative;
-  width: 100%;
-}
-
-.dropdown-trigger {
-  width: 100%;
+/* PC Room Row */
+.pc-room-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(13, 17, 23, 0.85);
-  border: 1px solid rgba(56, 139, 253, 0.3);
-  color: #f0f6fc;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: inherit;
+  background: var(--bg-input);
   padding: 10px 14px;
   border-radius: var(--radius-md);
-  cursor: pointer;
-  outline: none;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  text-align: left;
+  border: 1px solid var(--border-color);
 }
 
-.dropdown-trigger:hover {
-  border-color: var(--primary);
-  background: rgba(22, 27, 34, 0.95);
-  box-shadow: 0 0 12px rgba(56, 139, 253, 0.2);
-}
-
-.custom-dropdown.open .dropdown-trigger {
-  border-color: var(--primary-hover);
-  box-shadow: 0 0 0 3px rgba(56, 139, 253, 0.25);
-  background: #161b22;
-}
-
-.trigger-arrow {
-  color: var(--primary);
-  font-size: 11px;
-  transition: transform 0.25s ease;
-  pointer-events: none;
-}
-
-.custom-dropdown.open .trigger-arrow {
-  transform: rotate(180deg);
-}
-
-.dropdown-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  background: rgba(22, 27, 34, 0.96);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(56, 139, 253, 0.3);
-  border-radius: var(--radius-md);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(56, 139, 253, 0.15);
-  max-height: 240px;
-  overflow-y: auto;
-  z-index: 1000;
-  display: none;
-  padding: 6px;
-  animation: dropdownSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.custom-dropdown.open .dropdown-menu {
-  display: block;
-}
-
-@keyframes dropdownSlideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.dropdown-option {
-  padding: 9px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #c9d1d9;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all 0.15s ease;
+.pc-room-label {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-sub);
 }
 
-.dropdown-option:hover {
-  background: rgba(56, 139, 253, 0.15);
+/* Preset Chips Container */
+.preset-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 38px;
+  align-items: center;
+}
+
+.preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(56, 139, 253, 0.12);
+  border: 1px solid rgba(56, 139, 253, 0.3);
   color: #f0f6fc;
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.dropdown-option.active {
+.preset-chip:hover {
   background: rgba(56, 139, 253, 0.25);
-  color: #58a6ff;
-  font-weight: 700;
+  border-color: var(--primary);
+  transform: translateY(-1px);
 }
 
-.dropdown-option.active::after {
-  content: '✓';
-  color: #58a6ff;
-  font-weight: 800;
-  margin-left: 8px;
+.preset-chip .chip-count {
+  font-size: 10.5px;
+  color: var(--primary-hover);
+  background: rgba(56, 139, 253, 0.2);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.preset-chip .chip-delete {
+  color: #8b949e;
+  margin-left: 2px;
+  font-size: 11px;
+  padding: 2px;
+  border-radius: 50%;
+  transition: color 0.15s;
+}
+
+.preset-chip .chip-delete:hover {
+  color: #ff7b72;
+}
+
+.preset-empty-msg {
+  font-size: 12px;
+  color: #8b949e;
+}
+
+/* Modal Template Chips */
+.template-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 100px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.template-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: #c9d1d9;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.template-chip:hover {
+  background: rgba(56, 139, 253, 0.15);
+  border-color: var(--primary);
+  color: #f0f6fc;
 }
 
 /* Optimization Status Banner */
@@ -1375,55 +1370,38 @@ body {
           </div>
           
           <div class="options-grid">
-            <!-- 스타포스 이벤트 토글 스위치 (일반 vs 샤타포스) -->
-            <div class="option-item">
-              <label class="option-label">
-                <i class="fa-solid fa-calendar-star" style="color:var(--accent-gold);"></i> 스타포스 이벤트
-              </label>
-              <div class="segmented-control" id="eventSegmentedControl">
-                <button type="button" class="segment-btn active" data-value="shining">
-                  <i class="fa-solid fa-star" style="color:var(--accent-gold);"></i>
-                  <span>🌟 샤이닝 스타포스</span>
-                  <small>비용 30%↓ · 파괴 30%↓ · 복구 20%↓</small>
-                </button>
-                <button type="button" class="segment-btn" data-value="none">
-                  <i class="fa-solid fa-circle-minus"></i>
-                  <span>일반 (이벤트 없음)</span>
-                  <small>기본 확률 및 정가 비용</small>
-                </button>
+            <!-- 샤이닝 스타포스 직관적인 ON/OFF 토글 스위치 -->
+            <div class="event-toggle-card">
+              <div class="event-toggle-info">
+                <div class="event-toggle-title">샤이닝 스타포스</div>
+                <div class="event-toggle-desc">비용 30% 할인 · 21성 이하 파괴 30% 감소 · 흔적 복구 메소 20% 할인</div>
+              </div>
+              <div class="toggle-switch large">
+                <input type="checkbox" id="chkShiningEvent" checked>
+                <label for="chkShiningEvent" class="toggle-slider"></label>
               </div>
             </div>
 
-            <div class="option-row-double">
-              <!-- 커스텀 MVP 드롭다운 -->
-              <div class="option-item">
-                <label class="option-label">
-                  <i class="fa-solid fa-gem" style="color:#58a6ff;"></i> MVP 등급
-                </label>
-                <div class="custom-dropdown" id="dropdownMvp">
-                  <button type="button" class="dropdown-trigger" id="btnMvpTrigger">
-                    <span class="trigger-label">일반 (0%)</span>
-                    <i class="fa-solid fa-chevron-down trigger-arrow"></i>
-                  </button>
-                  <div class="dropdown-menu" id="menuMvp">
-                    <div class="dropdown-option active" data-value="0">일반 (0%)</div>
-                    <div class="dropdown-option" data-value="0.03">실버 (3%)</div>
-                    <div class="dropdown-option" data-value="0.05">골드 (5%)</div>
-                    <div class="dropdown-option" data-value="0.10">다이아 / 레드 (10%)</div>
-                  </div>
-                </div>
+            <!-- MVP 등급 세그먼트 버튼 그룹 -->
+            <div class="option-item">
+              <label class="option-label">MVP 등급</label>
+              <div class="pill-button-group" id="mvpButtonGroup">
+                <button type="button" class="pill-btn active" data-value="0">일반 (0%)</button>
+                <button type="button" class="pill-btn" data-value="0.03">실버 (3%)</button>
+                <button type="button" class="pill-btn" data-value="0.05">골드 (5%)</button>
+                <button type="button" class="pill-btn" data-value="0.10">다이아 (10%)</button>
               </div>
+            </div>
 
-              <!-- PC방 할인 토글 -->
-              <div class="option-item">
-                <label class="option-label" for="chkPcRoom">
-                  <i class="fa-solid fa-desktop" style="color:#56d364;"></i> PC방 혜택
-                </label>
-                <div class="toggle-switch small">
-                  <input type="checkbox" id="chkPcRoom">
-                  <label for="chkPcRoom" class="toggle-slider"></label>
-                  <span class="toggle-text">5% 할인</span>
-                </div>
+            <!-- PC방 할인 토글 -->
+            <div class="pc-room-row">
+              <div class="pc-room-label">
+                <i class="fa-solid fa-desktop" style="color:#56d364;"></i>
+                <span>PC방 혜택 (5% 추가 할인)</span>
+              </div>
+              <div class="toggle-switch small">
+                <input type="checkbox" id="chkPcRoom">
+                <label for="chkPcRoom" class="toggle-slider"></label>
               </div>
             </div>
 
@@ -1438,7 +1416,7 @@ body {
           </div>
         </section>
 
-        <!-- Custom Preset Management Section -->
+        <!-- Custom Preset Management Section (태그 칩 UI) -->
         <section class="card preset-card">
           <div class="card-header-flex">
             <div class="card-title">
@@ -1446,25 +1424,11 @@ body {
               <span>내 커스텀 프리셋</span>
             </div>
             <button type="button" class="btn-sm btn-secondary" id="btnSaveCustomPreset">
-              <i class="fa-solid fa-plus"></i> 현재 목록을 프리셋으로 저장
+              <i class="fa-solid fa-plus"></i> 현재 목록 저장
             </button>
           </div>
-          <div class="custom-preset-row">
-            <div class="custom-dropdown" id="dropdownPresets" style="flex:1;">
-              <button type="button" class="dropdown-trigger" id="btnPresetTrigger">
-                <span class="trigger-label">-- 저장된 프리셋 선택 --</span>
-                <i class="fa-solid fa-chevron-down trigger-arrow"></i>
-              </button>
-              <div class="dropdown-menu" id="menuPresets">
-                <!-- Populated via JS -->
-              </div>
-            </div>
-            <button type="button" class="btn-sm btn-primary" id="btnLoadCustomPreset">
-              <i class="fa-solid fa-folder-open"></i> 불러오기
-            </button>
-            <button type="button" class="btn-sm btn-danger-sm" id="btnDeleteCustomPreset" title="선택한 프리셋 삭제">
-              <i class="fa-solid fa-trash"></i>
-            </button>
+          <div class="preset-chips-container" id="presetChipsContainer">
+            <!-- Populated via JS: chips like [칠흑 5세트 (5) ✕] -->
           </div>
         </section>
 
@@ -1672,15 +1636,9 @@ body {
         <input type="hidden" id="editItemId" value="">
         
         <div class="form-group">
-          <label>기본 장비 템플릿 선택</label>
-          <div class="custom-dropdown" id="dropdownModalPreset">
-            <button type="button" class="dropdown-trigger" id="btnModalPresetTrigger">
-              <span class="trigger-label">-- 직접 입력 --</span>
-              <i class="fa-solid fa-chevron-down trigger-arrow"></i>
-            </button>
-            <div class="dropdown-menu" id="menuModalPreset">
-              <!-- Populated via JS -->
-            </div>
+          <label>빠른 장비 템플릿 선택</label>
+          <div class="template-chips-container" id="modalTemplateChips">
+            <!-- Populated via JS: chips like [에테르넬] [거대한 공포] [근원의 속삭임] ... -->
           </div>
         </div>
 
@@ -2568,7 +2526,6 @@ const state = {
 
 // 로컬 스토리지 키
 const STORAGE_KEY_PRESETS = 'maple_sf_custom_presets_v2';
-let selectedPresetKey = '';
 
 /**
  * 메소 단위를 '~억 ~만 메소'로 포맷팅
@@ -2604,7 +2561,7 @@ export function formatManMeso(manVal) {
 }
 
 /**
- * 전역 옵션 객체 가공 (성수별 독립 복구 최적화 지원)
+ * 전역 옵션 객체 가공
  */
 function getCalculatedOptions() {
   const ev = state.options.event === 'none' ? null : state.options.event;
@@ -3038,7 +2995,7 @@ function renderTables(result) {
 }
 
 /**
- * 커스텀 프리셋 저장/불러오기/삭제 관리
+ * 커스텀 프리셋 저장/불러오기/삭제 관리 (태그 칩 UI)
  */
 function getSavedPresets() {
   try {
@@ -3053,76 +3010,80 @@ function savePresetsToStorage(presets) {
   localStorage.setItem(STORAGE_KEY_PRESETS, JSON.stringify(presets));
 }
 
-function renderCustomPresetDropdown() {
-  const menu = document.getElementById('menuPresets');
-  const triggerLabel = document.querySelector('#btnPresetTrigger .trigger-label');
-  if (!menu || !triggerLabel) return;
+function renderCustomPresetChips() {
+  const container = document.getElementById('presetChipsContainer');
+  if (!container) return;
 
   const presets = getSavedPresets();
   const keys = Object.keys(presets);
 
   if (keys.length === 0) {
-    menu.innerHTML = '<div class="dropdown-option" style="color:#8b949e; cursor:default;">저장된 프리셋이 없습니다</div>';
-    triggerLabel.innerText = '-- 저장된 프리셋 선택 --';
-    selectedPresetKey = '';
+    container.innerHTML = '<span class="preset-empty-msg">저장된 프리셋이 없습니다. 장비를 구성한 후 [+ 현재 목록 저장]을 눌러보세요.</span>';
     return;
   }
 
-  menu.innerHTML = keys.map(k => `
-    <div class="dropdown-option ${k === selectedPresetKey ? 'active' : ''}" data-key="${k}">
+  container.innerHTML = keys.map(k => `
+    <div class="preset-chip" data-key="${k}" title="클릭 시 이 프리셋을 불러옵니다">
       <span>${k}</span>
-      <small style="font-size:11px; color:#8b949e;">(${presets[k].length}부위)</small>
+      <span class="chip-count">${presets[k].length}부위</span>
+      <i class="fa-solid fa-xmark chip-delete" data-del-key="${k}" title="프리셋 삭제"></i>
     </div>
   `).join('');
 
-  if (selectedPresetKey && presets[selectedPresetKey]) {
-    triggerLabel.innerText = `${selectedPresetKey} (${presets[selectedPresetKey].length}부위)`;
-  } else {
-    triggerLabel.innerText = '-- 저장된 프리셋 선택 --';
-  }
+  // 칩 클릭 시 불러오기
+  container.querySelectorAll('.preset-chip').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      if (e.target.classList.contains('chip-delete')) return;
+      const k = chip.dataset.key;
+      const presets = getSavedPresets();
+      if (presets[k]) {
+        state.items = JSON.parse(JSON.stringify(presets[k]));
+        runAnalysis();
+      }
+    });
+  });
 
-  menu.querySelectorAll('.dropdown-option[data-key]').forEach(opt => {
-    opt.addEventListener('click', () => {
-      selectedPresetKey = opt.dataset.key;
-      renderCustomPresetDropdown();
-      document.getElementById('dropdownPresets').classList.remove('open');
+  // 칩 삭제 버튼
+  container.querySelectorAll('.chip-delete').forEach(delBtn => {
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const k = delBtn.dataset.delKey;
+      if (confirm(`'${k}' 프리셋을 삭제하시겠습니까?`)) {
+        const presets = getSavedPresets();
+        delete presets[k];
+        savePresetsToStorage(presets);
+        renderCustomPresetChips();
+      }
     });
   });
 }
 
 /**
- * 모달 열기/닫기
+ * 모달 열기/닫기 & 빠른 템플릿 칩 렌더링
  */
 let currentEditIdx = -1;
 
-function renderModalPresetDropdown() {
-  const menu = document.getElementById('menuModalPreset');
-  const triggerLabel = document.querySelector('#btnModalPresetTrigger .trigger-label');
-  if (!menu || !triggerLabel) return;
+function renderModalTemplateChips() {
+  const container = document.getElementById('modalTemplateChips');
+  if (!container) return;
 
-  menu.innerHTML = '<div class="dropdown-option" data-id="">-- 직접 입력 --</div>' +
-    STARFORCE_CONFIG.itemPresets.map(p => `
-      <div class="dropdown-option" data-id="${p.id}">
-        <span>${p.name}</span>
-        <small style="font-size:11px; color:#8b949e;">(${p.level}제 · ${formatMeso(p.defaultBaseCost)})</small>
-      </div>
-    `).join('');
+  container.innerHTML = STARFORCE_CONFIG.itemPresets.map(p => `
+    <button type="button" class="template-chip" data-id="${p.id}">
+      ${p.name} (${p.level}제)
+    </button>
+  `).join('');
 
-  menu.querySelectorAll('.dropdown-option').forEach(opt => {
-    opt.addEventListener('click', () => {
-      const pId = opt.dataset.id;
+  container.querySelectorAll('.template-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const pId = chip.dataset.id;
       const preset = STARFORCE_CONFIG.itemPresets.find(p => p.id === pId);
       if (preset) {
-        triggerLabel.innerText = preset.name;
         document.getElementById('inputItemName').value = preset.name;
         document.getElementById('inputItemLevel').value = preset.level;
         const manCost = Math.round(preset.defaultBaseCost / 10000);
         document.getElementById('inputBaseCost').value = manCost;
         document.getElementById('baseCostFormatted').innerText = formatManMeso(manCost);
-      } else {
-        triggerLabel.innerText = '-- 직접 입력 --';
       }
-      document.getElementById('dropdownModalPreset').classList.remove('open');
     });
   });
 }
@@ -3131,9 +3092,8 @@ function openItemModal(editIdx = -1) {
   currentEditIdx = editIdx;
   const modal = document.getElementById('itemModal');
   const title = document.getElementById('modalTitle');
-  const triggerLabel = document.querySelector('#btnModalPresetTrigger .trigger-label');
 
-  renderModalPresetDropdown();
+  renderModalTemplateChips();
 
   if (editIdx >= 0) {
     title.innerText = '강화 장비 수정';
@@ -3146,7 +3106,6 @@ function openItemModal(editIdx = -1) {
     document.getElementById('inputBaseCost').value = baseCostInMan;
     document.getElementById('inputItemCount').value = it.count || 1;
     document.getElementById('baseCostFormatted').innerText = formatManMeso(baseCostInMan);
-    if (triggerLabel) triggerLabel.innerText = it.name;
   } else {
     title.innerText = '새 강화 장비 추가';
     document.getElementById('itemForm').reset();
@@ -3156,7 +3115,6 @@ function openItemModal(editIdx = -1) {
     document.getElementById('inputBaseCost').value = 400000;
     document.getElementById('inputItemCount').value = 1;
     document.getElementById('baseCostFormatted').innerText = formatManMeso(400000);
-    if (triggerLabel) triggerLabel.innerText = '-- 직접 입력 --';
   }
 
   modal.classList.add('active');
@@ -3167,94 +3125,33 @@ function closeItemModal() {
 }
 
 /**
- * 커스텀 드롭다운 전역 이벤트 설정
- */
-function setupCustomDropdowns() {
-  // 1. MVP 드롭다운
-  const ddMvp = document.getElementById('dropdownMvp');
-  const btnMvp = document.getElementById('btnMvpTrigger');
-  const menuMvp = document.getElementById('menuMvp');
-  const labelMvp = btnMvp.querySelector('.trigger-label');
-
-  if (btnMvp) {
-    btnMvp.addEventListener('click', (e) => {
-      e.stopPropagation();
-      closeAllDropdowns(ddMvp);
-      ddMvp.classList.toggle('open');
-    });
-  }
-
-  if (menuMvp) {
-    menuMvp.querySelectorAll('.dropdown-option').forEach(opt => {
-      opt.addEventListener('click', () => {
-        const val = parseFloat(opt.dataset.value);
-        state.options.mvpDiscount = val;
-        labelMvp.innerText = opt.innerText;
-        menuMvp.querySelectorAll('.dropdown-option').forEach(o => o.classList.remove('active'));
-        opt.classList.add('active');
-        ddMvp.classList.remove('open');
-        runAnalysis();
-      });
-    });
-  }
-
-  // 2. 프리셋 드롭다운
-  const ddPresets = document.getElementById('dropdownPresets');
-  const btnPresets = document.getElementById('btnPresetTrigger');
-  if (btnPresets) {
-    btnPresets.addEventListener('click', (e) => {
-      e.stopPropagation();
-      closeAllDropdowns(ddPresets);
-      ddPresets.classList.toggle('open');
-    });
-  }
-
-  // 3. 모달 프리셋 드롭다운
-  const ddModal = document.getElementById('dropdownModalPreset');
-  const btnModal = document.getElementById('btnModalPresetTrigger');
-  if (btnModal) {
-    btnModal.addEventListener('click', (e) => {
-      e.stopPropagation();
-      closeAllDropdowns(ddModal);
-      ddModal.classList.toggle('open');
-    });
-  }
-
-  // 외부 클릭 시 모든 드롭다운 닫기
-  document.addEventListener('click', () => closeAllDropdowns());
-}
-
-function closeAllDropdowns(exceptElement = null) {
-  document.querySelectorAll('.custom-dropdown').forEach(dd => {
-    if (dd !== exceptElement) {
-      dd.classList.remove('open');
-    }
-  });
-}
-
-/**
  * 이벤트 리스너 등록
  */
 function initEvents() {
-  setupCustomDropdowns();
-
-  // 이벤트 세그먼트 토글 버튼 (일반 vs 샤이닝 스타포스)
-  const segButtons = document.querySelectorAll('#eventSegmentedControl .segment-btn');
-  segButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      segButtons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const val = btn.dataset.value;
-      if (val === 'shining') {
+  // 1. 샤이닝 스타포스 ON/OFF 토글 스위치
+  const chkShining = document.getElementById('chkShiningEvent');
+  if (chkShining) {
+    chkShining.addEventListener('change', (e) => {
+      if (e.target.checked) {
         state.options.event = '샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인)';
       } else {
         state.options.event = 'none';
       }
       runAnalysis();
     });
+  }
+
+  // 2. MVP 등급 알약형 버튼 그룹
+  document.querySelectorAll('#mvpButtonGroup .pill-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#mvpButtonGroup .pill-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.options.mvpDiscount = parseFloat(btn.dataset.value) || 0;
+      runAnalysis();
+    });
   });
 
-  // PC방 할인 토글
+  // 3. PC방 할인 토글
   const chkPc = document.getElementById('chkPcRoom');
   if (chkPc) {
     chkPc.addEventListener('change', (e) => {
@@ -3263,7 +3160,7 @@ function initEvents() {
     });
   }
 
-  // 1. 커스텀 프리셋 저장 버튼
+  // 4. 커스텀 프리셋 저장 버튼
   document.getElementById('btnSaveCustomPreset').addEventListener('click', () => {
     if (state.items.length === 0) {
       alert('저장할 장비 목록이 비어 있습니다. 먼저 장비를 추가하세요.');
@@ -3275,40 +3172,11 @@ function initEvents() {
     const presets = getSavedPresets();
     presets[presetName.trim()] = JSON.parse(JSON.stringify(state.items));
     savePresetsToStorage(presets);
-    selectedPresetKey = presetName.trim();
-    renderCustomPresetDropdown();
+    renderCustomPresetChips();
     alert(`'${presetName.trim()}' 프리셋이 저장되었습니다!`);
   });
 
-  // 2. 커스텀 프리셋 불러오기 버튼
-  document.getElementById('btnLoadCustomPreset').addEventListener('click', () => {
-    if (!selectedPresetKey) {
-      alert('불러올 프리셋을 먼저 선택하세요.');
-      return;
-    }
-    const presets = getSavedPresets();
-    if (presets[selectedPresetKey]) {
-      state.items = JSON.parse(JSON.stringify(presets[selectedPresetKey]));
-      runAnalysis();
-    }
-  });
-
-  // 3. 커스텀 프리셋 삭제 버튼
-  document.getElementById('btnDeleteCustomPreset').addEventListener('click', () => {
-    if (!selectedPresetKey) {
-      alert('삭제할 프리셋을 선택하세요.');
-      return;
-    }
-    if (confirm(`'${selectedPresetKey}' 프리셋을 정말 삭제하시겠습니까?`)) {
-      const presets = getSavedPresets();
-      delete presets[selectedPresetKey];
-      savePresetsToStorage(presets);
-      selectedPresetKey = '';
-      renderCustomPresetDropdown();
-    }
-  });
-
-  // 전체 비우기 & 추가 모달
+  // 5. 전체 비우기 & 추가 모달
   document.getElementById('btnClearItems').addEventListener('click', () => {
     if (confirm('등록된 모든 장비를 목록에서 비우시겠습니까?')) {
       state.items = [];
@@ -3369,7 +3237,7 @@ function initEvents() {
       }
 
       let report = `📊 [메이플 스타포스 강화 분석 리포트]\n`;
-      report += `• 적용 이벤트: ${calculatedOptions.event || '일반 (없음)'}\n`;
+      report += `• 적용 이벤트: ${calculatedOptions.event ? '샤이닝 스타포스' : '일반 (없음)'}\n`;
       report += `• 자동 최적화(DP): ON (최소 비용 최적화)\n`;
       report += `• 총 기대 비용: ${formatMeso(result.totalExpCost)}\n`;
       report += `• 중앙값(50%): ${formatMeso(result.percentiles.p50)}\n`;
@@ -3497,7 +3365,7 @@ function initEvents() {
 
 // 초기화
 window.addEventListener('DOMContentLoaded', () => {
-  renderCustomPresetDropdown();
+  renderCustomPresetChips();
   initEvents();
   runAnalysis();
 });

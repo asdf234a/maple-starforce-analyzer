@@ -44,55 +44,38 @@
           </div>
           
           <div class="options-grid">
-            <!-- 스타포스 이벤트 토글 스위치 (일반 vs 샤타포스) -->
-            <div class="option-item">
-              <label class="option-label">
-                <i class="fa-solid fa-calendar-star" style="color:var(--accent-gold);"></i> 스타포스 이벤트
-              </label>
-              <div class="segmented-control" id="eventSegmentedControl">
-                <button type="button" class="segment-btn active" data-value="shining">
-                  <i class="fa-solid fa-star" style="color:var(--accent-gold);"></i>
-                  <span>🌟 샤이닝 스타포스</span>
-                  <small>비용 30%↓ · 파괴 30%↓ · 복구 20%↓</small>
-                </button>
-                <button type="button" class="segment-btn" data-value="none">
-                  <i class="fa-solid fa-circle-minus"></i>
-                  <span>일반 (이벤트 없음)</span>
-                  <small>기본 확률 및 정가 비용</small>
-                </button>
+            <!-- 샤이닝 스타포스 직관적인 ON/OFF 토글 스위치 -->
+            <div class="event-toggle-card">
+              <div class="event-toggle-info">
+                <div class="event-toggle-title">샤이닝 스타포스</div>
+                <div class="event-toggle-desc">비용 30% 할인 · 21성 이하 파괴 30% 감소 · 흔적 복구 메소 20% 할인</div>
+              </div>
+              <div class="toggle-switch large">
+                <input type="checkbox" id="chkShiningEvent" checked>
+                <label for="chkShiningEvent" class="toggle-slider"></label>
               </div>
             </div>
 
-            <div class="option-row-double">
-              <!-- 커스텀 MVP 드롭다운 -->
-              <div class="option-item">
-                <label class="option-label">
-                  <i class="fa-solid fa-gem" style="color:#58a6ff;"></i> MVP 등급
-                </label>
-                <div class="custom-dropdown" id="dropdownMvp">
-                  <button type="button" class="dropdown-trigger" id="btnMvpTrigger">
-                    <span class="trigger-label">일반 (0%)</span>
-                    <i class="fa-solid fa-chevron-down trigger-arrow"></i>
-                  </button>
-                  <div class="dropdown-menu" id="menuMvp">
-                    <div class="dropdown-option active" data-value="0">일반 (0%)</div>
-                    <div class="dropdown-option" data-value="0.03">실버 (3%)</div>
-                    <div class="dropdown-option" data-value="0.05">골드 (5%)</div>
-                    <div class="dropdown-option" data-value="0.10">다이아 / 레드 (10%)</div>
-                  </div>
-                </div>
+            <!-- MVP 등급 세그먼트 버튼 그룹 -->
+            <div class="option-item">
+              <label class="option-label">MVP 등급</label>
+              <div class="pill-button-group" id="mvpButtonGroup">
+                <button type="button" class="pill-btn active" data-value="0">일반 (0%)</button>
+                <button type="button" class="pill-btn" data-value="0.03">실버 (3%)</button>
+                <button type="button" class="pill-btn" data-value="0.05">골드 (5%)</button>
+                <button type="button" class="pill-btn" data-value="0.10">다이아 (10%)</button>
               </div>
+            </div>
 
-              <!-- PC방 할인 토글 -->
-              <div class="option-item">
-                <label class="option-label" for="chkPcRoom">
-                  <i class="fa-solid fa-desktop" style="color:#56d364;"></i> PC방 혜택
-                </label>
-                <div class="toggle-switch small">
-                  <input type="checkbox" id="chkPcRoom">
-                  <label for="chkPcRoom" class="toggle-slider"></label>
-                  <span class="toggle-text">5% 할인</span>
-                </div>
+            <!-- PC방 할인 토글 -->
+            <div class="pc-room-row">
+              <div class="pc-room-label">
+                <i class="fa-solid fa-desktop" style="color:#56d364;"></i>
+                <span>PC방 혜택 (5% 추가 할인)</span>
+              </div>
+              <div class="toggle-switch small">
+                <input type="checkbox" id="chkPcRoom">
+                <label for="chkPcRoom" class="toggle-slider"></label>
               </div>
             </div>
 
@@ -107,7 +90,7 @@
           </div>
         </section>
 
-        <!-- Custom Preset Management Section -->
+        <!-- Custom Preset Management Section (태그 칩 UI) -->
         <section class="card preset-card">
           <div class="card-header-flex">
             <div class="card-title">
@@ -115,25 +98,11 @@
               <span>내 커스텀 프리셋</span>
             </div>
             <button type="button" class="btn-sm btn-secondary" id="btnSaveCustomPreset">
-              <i class="fa-solid fa-plus"></i> 현재 목록을 프리셋으로 저장
+              <i class="fa-solid fa-plus"></i> 현재 목록 저장
             </button>
           </div>
-          <div class="custom-preset-row">
-            <div class="custom-dropdown" id="dropdownPresets" style="flex:1;">
-              <button type="button" class="dropdown-trigger" id="btnPresetTrigger">
-                <span class="trigger-label">-- 저장된 프리셋 선택 --</span>
-                <i class="fa-solid fa-chevron-down trigger-arrow"></i>
-              </button>
-              <div class="dropdown-menu" id="menuPresets">
-                <!-- Populated via JS -->
-              </div>
-            </div>
-            <button type="button" class="btn-sm btn-primary" id="btnLoadCustomPreset">
-              <i class="fa-solid fa-folder-open"></i> 불러오기
-            </button>
-            <button type="button" class="btn-sm btn-danger-sm" id="btnDeleteCustomPreset" title="선택한 프리셋 삭제">
-              <i class="fa-solid fa-trash"></i>
-            </button>
+          <div class="preset-chips-container" id="presetChipsContainer">
+            <!-- Populated via JS: chips like [칠흑 5세트 (5) ✕] -->
           </div>
         </section>
 
@@ -341,15 +310,9 @@
         <input type="hidden" id="editItemId" value="">
         
         <div class="form-group">
-          <label>기본 장비 템플릿 선택</label>
-          <div class="custom-dropdown" id="dropdownModalPreset">
-            <button type="button" class="dropdown-trigger" id="btnModalPresetTrigger">
-              <span class="trigger-label">-- 직접 입력 --</span>
-              <i class="fa-solid fa-chevron-down trigger-arrow"></i>
-            </button>
-            <div class="dropdown-menu" id="menuModalPreset">
-              <!-- Populated via JS -->
-            </div>
+          <label>빠른 장비 템플릿 선택</label>
+          <div class="template-chips-container" id="modalTemplateChips">
+            <!-- Populated via JS: chips like [에테르넬] [거대한 공포] [근원의 속삭임] ... -->
           </div>
         </div>
 

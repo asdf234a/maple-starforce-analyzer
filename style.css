@@ -223,185 +223,180 @@ body {
   align-items: center;
 }
 
-/* Segmented Control for Events */
-.segmented-control {
+/* Event Toggle Card (샤이닝 스타포스 ON/OFF) */
+.event-toggle-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, rgba(241, 224, 90, 0.08), rgba(56, 139, 253, 0.08));
+  border: 1px solid rgba(241, 224, 90, 0.25);
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+}
+
+.event-toggle-card:has(input:checked) {
+  background: linear-gradient(135deg, rgba(241, 224, 90, 0.15), rgba(56, 139, 253, 0.15));
+  border-color: rgba(241, 224, 90, 0.5);
+  box-shadow: 0 0 15px rgba(241, 224, 90, 0.1);
+}
+
+.event-toggle-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #f0f6fc;
+  margin-bottom: 3px;
+}
+
+.event-toggle-desc {
+  font-size: 11px;
+  color: #8b949e;
+  line-height: 1.35;
+}
+
+.event-toggle-card:has(input:checked) .event-toggle-title {
+  color: var(--accent-gold);
+}
+
+/* Pill Button Group (MVP 등급) */
+.pill-button-group {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
   background: var(--bg-input);
-  padding: 5px;
+  padding: 4px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
 }
 
-.segment-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 10px 8px;
+.pill-btn {
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 4px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.15s ease;
   text-align: center;
 }
 
-.segment-btn span {
-  font-size: 12.5px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.segment-btn small {
-  font-size: 10px;
-  color: #8b949e;
-  font-weight: 500;
-}
-
-.segment-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
+.pill-btn:hover {
   color: var(--text-main);
+  background: rgba(255, 255, 255, 0.04);
 }
 
-.segment-btn.active {
-  background: rgba(56, 139, 253, 0.18);
+.pill-btn.active {
+  background: rgba(56, 139, 253, 0.2);
   border-color: rgba(56, 139, 253, 0.4);
-  color: #f0f6fc;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.segment-btn.active small {
   color: #58a6ff;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
-.segment-btn[data-value="shining"].active {
-  background: linear-gradient(135deg, rgba(241, 224, 90, 0.15), rgba(56, 139, 253, 0.15));
-  border-color: rgba(241, 224, 90, 0.4);
-  color: #f0f6fc;
-}
-
-.segment-btn[data-value="shining"].active small {
-  color: var(--accent-gold);
-}
-
-/* Custom Dropdown Component */
-.custom-dropdown {
-  position: relative;
-  width: 100%;
-}
-
-.dropdown-trigger {
-  width: 100%;
+/* PC Room Row */
+.pc-room-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(13, 17, 23, 0.85);
-  border: 1px solid rgba(56, 139, 253, 0.3);
-  color: #f0f6fc;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: inherit;
+  background: var(--bg-input);
   padding: 10px 14px;
   border-radius: var(--radius-md);
-  cursor: pointer;
-  outline: none;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  text-align: left;
+  border: 1px solid var(--border-color);
 }
 
-.dropdown-trigger:hover {
-  border-color: var(--primary);
-  background: rgba(22, 27, 34, 0.95);
-  box-shadow: 0 0 12px rgba(56, 139, 253, 0.2);
-}
-
-.custom-dropdown.open .dropdown-trigger {
-  border-color: var(--primary-hover);
-  box-shadow: 0 0 0 3px rgba(56, 139, 253, 0.25);
-  background: #161b22;
-}
-
-.trigger-arrow {
-  color: var(--primary);
-  font-size: 11px;
-  transition: transform 0.25s ease;
-  pointer-events: none;
-}
-
-.custom-dropdown.open .trigger-arrow {
-  transform: rotate(180deg);
-}
-
-.dropdown-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  background: rgba(22, 27, 34, 0.96);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(56, 139, 253, 0.3);
-  border-radius: var(--radius-md);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(56, 139, 253, 0.15);
-  max-height: 240px;
-  overflow-y: auto;
-  z-index: 1000;
-  display: none;
-  padding: 6px;
-  animation: dropdownSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.custom-dropdown.open .dropdown-menu {
-  display: block;
-}
-
-@keyframes dropdownSlideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.dropdown-option {
-  padding: 9px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #c9d1d9;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all 0.15s ease;
+.pc-room-label {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-sub);
 }
 
-.dropdown-option:hover {
-  background: rgba(56, 139, 253, 0.15);
+/* Preset Chips Container */
+.preset-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 38px;
+  align-items: center;
+}
+
+.preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(56, 139, 253, 0.12);
+  border: 1px solid rgba(56, 139, 253, 0.3);
   color: #f0f6fc;
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.dropdown-option.active {
+.preset-chip:hover {
   background: rgba(56, 139, 253, 0.25);
-  color: #58a6ff;
-  font-weight: 700;
+  border-color: var(--primary);
+  transform: translateY(-1px);
 }
 
-.dropdown-option.active::after {
-  content: '✓';
-  color: #58a6ff;
-  font-weight: 800;
-  margin-left: 8px;
+.preset-chip .chip-count {
+  font-size: 10.5px;
+  color: var(--primary-hover);
+  background: rgba(56, 139, 253, 0.2);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.preset-chip .chip-delete {
+  color: #8b949e;
+  margin-left: 2px;
+  font-size: 11px;
+  padding: 2px;
+  border-radius: 50%;
+  transition: color 0.15s;
+}
+
+.preset-chip .chip-delete:hover {
+  color: #ff7b72;
+}
+
+.preset-empty-msg {
+  font-size: 12px;
+  color: #8b949e;
+}
+
+/* Modal Template Chips */
+.template-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 100px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.template-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: #c9d1d9;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.template-chip:hover {
+  background: rgba(56, 139, 253, 0.15);
+  border-color: var(--primary);
+  color: #f0f6fc;
 }
 
 /* Optimization Status Banner */
