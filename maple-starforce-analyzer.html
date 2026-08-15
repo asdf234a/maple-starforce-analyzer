@@ -2767,7 +2767,7 @@ function renderItemsList() {
 }
 
 /**
- * 비용 분포도 차트 렌더링 (Chart.js)
+ * 비용 분포도 차트 렌더링 (Chart.js) - 99.995% 초과 롱테일 꼬리 컷오프 적용
  */
 function renderCostChart(result) {
   const ctx = document.getElementById('costDistChart').getContext('2d');
@@ -2776,21 +2776,30 @@ function renderCostChart(result) {
     return;
   }
 
-  const { totalCostPMF, totalCostCDF, binSize, percentiles, smithAnalysis } = result;
+  const { totalCostPMF, totalCostCDF, binSize } = result;
 
-  const maxIdx = totalCostPMF.length;
-  const step = Math.max(1, Math.floor(maxIdx / 120));
+  // 99.995% 초과 롱테일 꼬리 컷오프 (가독성 최적화)
+  let cutoffIdx = totalCostPMF.length;
+  for (let i = 0; i < totalCostCDF.length; i++) {
+    if (totalCostCDF[i] >= 0.99995) {
+      cutoffIdx = i + 1;
+      break;
+    }
+  }
+  cutoffIdx = Math.max(10, Math.min(totalCostPMF.length, cutoffIdx));
+
+  const step = Math.max(1, Math.floor(cutoffIdx / 100));
   
   const labels = [];
   const pmfData = [];
   const cdfData = [];
 
-  for (let i = 0; i < maxIdx; i += step) {
+  for (let i = 0; i < cutoffIdx; i += step) {
     const cost = i * binSize;
     labels.push(formatMeso(cost));
     
     let sumP = 0;
-    for (let j = i; j < Math.min(maxIdx, i + step); j++) {
+    for (let j = i; j < Math.min(cutoffIdx, i + step); j++) {
       sumP += totalCostPMF[j];
     }
     pmfData.push((sumP * 100).toFixed(3));
@@ -2879,7 +2888,7 @@ function renderCostChart(result) {
 }
 
 /**
- * 파괴 횟수 분포 차트 렌더링
+ * 파괴 횟수 분포 차트 렌더링 - 99.995% 초과 롱테일 컷오프
  */
 function renderDestroyChart(result) {
   const ctx = document.getElementById('destroyDistChart').getContext('2d');
@@ -2888,7 +2897,17 @@ function renderDestroyChart(result) {
     return;
   }
 
-  const stats = result.destroyStats;
+  // 99.995% 누적 도달 시점까지만 슬라이스
+  let stats = result.destroyStats;
+  let cutIdx = stats.length;
+  for (let i = 0; i < stats.length; i++) {
+    if (stats[i].cumulative >= 0.99995) {
+      cutIdx = i + 1;
+      break;
+    }
+  }
+  stats = stats.slice(0, Math.max(3, cutIdx));
+
   const labels = stats.map(s => `${s.destroys}개 파괴`);
   const probs = stats.map(s => (s.probability * 100).toFixed(2));
   const cumProbs = stats.map(s => (s.cumulative * 100).toFixed(1));
