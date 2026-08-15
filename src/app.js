@@ -153,11 +153,18 @@ function renderItemsList() {
 
   if (state.items.length === 0) {
     container.innerHTML = `
-      <div class="empty-items-state">
+      <div class="empty-items-state" id="btnEmptyAdd">
         <i class="fa-solid fa-layer-group"></i>
-        <p>강화할 장비가 없습니다.<br>아래 <strong>[+ 장비 추가]</strong> 버튼을 눌러 강화 대상을 등록해보세요.</p>
+        <p>강화할 장비가 없습니다.<br>클릭하여 첫 강화 대상을 등록해보세요!</p>
+        <button type="button" class="btn-primary-sm" style="margin-top:10px;">
+          <i class="fa-solid fa-plus"></i> 첫 장비 추가하기
+        </button>
       </div>
     `;
+    const emptyBtn = document.getElementById('btnEmptyAdd');
+    if (emptyBtn) {
+      emptyBtn.addEventListener('click', () => openItemModal(-1));
+    }
     return;
   }
 
@@ -572,7 +579,9 @@ function renderModalTemplateChips() {
   `).join('');
 
   container.querySelectorAll('.template-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
+    chip.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       const pId = chip.dataset.id;
       const preset = STARFORCE_CONFIG.itemPresets.find(p => p.id === pId);
       if (preset) {
@@ -596,23 +605,23 @@ function openItemModal(editIdx = -1) {
   if (editIdx >= 0) {
     title.innerText = '강화 장비 수정';
     const it = state.items[editIdx];
-    document.getElementById('inputItemName').value = it.name;
-    document.getElementById('inputItemLevel').value = it.level;
-    document.getElementById('inputStartStar').value = it.startStar;
-    document.getElementById('inputTargetStar').value = it.targetStar;
-    const baseCostInMan = Math.round(it.baseCost / 10000);
+    document.getElementById('inputItemName').value = it.name || '장비';
+    document.getElementById('inputItemLevel').value = it.level || 200;
+    document.getElementById('inputStartStar').value = it.startStar ?? 0;
+    document.getElementById('inputTargetStar').value = it.targetStar ?? 22;
+    const baseCostInMan = Math.round((it.baseCost || 0) / 10000);
     document.getElementById('inputBaseCost').value = baseCostInMan;
     document.getElementById('inputItemCount').value = it.count || 1;
     document.getElementById('baseCostFormatted').innerText = formatManMeso(baseCostInMan);
   } else {
     title.innerText = '새 강화 장비 추가';
-    document.getElementById('itemForm').reset();
-    document.getElementById('inputItemLevel').value = 200;
+    document.getElementById('inputItemName').value = '근원의 속삭임';
+    document.getElementById('inputItemLevel').value = 250;
     document.getElementById('inputStartStar').value = 0;
     document.getElementById('inputTargetStar').value = 22;
-    document.getElementById('inputBaseCost').value = 400000;
+    document.getElementById('inputBaseCost').value = 60000; // 6억 = 60,000만 메소
     document.getElementById('inputItemCount').value = 1;
-    document.getElementById('baseCostFormatted').innerText = formatManMeso(400000);
+    document.getElementById('baseCostFormatted').innerText = formatManMeso(60000);
   }
 
   modal.classList.add('active');
@@ -692,26 +701,28 @@ function initEvents() {
     document.getElementById('baseCostFormatted').innerText = formatManMeso(manVal);
   });
 
-  // 장비 저장 폼
-  document.getElementById('itemForm').addEventListener('submit', (e) => {
-    e.preventDefault();
+  function saveItemFromModal() {
+    const nameVal = document.getElementById('inputItemName').value.trim() || '장비';
+    const levelVal = parseInt(document.getElementById('inputItemLevel').value) || 200;
+    const startVal = parseInt(document.getElementById('inputStartStar').value) ?? 0;
+    const targetVal = parseInt(document.getElementById('inputTargetStar').value) || 22;
     const manVal = parseFloat(document.getElementById('inputBaseCost').value) || 0;
-    const baseCostInMeso = manVal * 10000;
+    const countVal = parseInt(document.getElementById('inputItemCount').value) || 1;
 
-    const itemData = {
-      id: 'item_' + Date.now(),
-      name: document.getElementById('inputItemName').value.trim() || '장비',
-      level: parseInt(document.getElementById('inputItemLevel').value) || 200,
-      startStar: parseInt(document.getElementById('inputStartStar').value) || 0,
-      targetStar: parseInt(document.getElementById('inputTargetStar').value) || 22,
-      baseCost: baseCostInMeso,
-      count: parseInt(document.getElementById('inputItemCount').value) || 1
-    };
-
-    if (itemData.startStar >= itemData.targetStar) {
+    if (startVal >= targetVal) {
       alert('목표 성수는 시작 성수보다 높아야 합니다.');
       return;
     }
+
+    const itemData = {
+      id: 'item_' + Date.now(),
+      name: nameVal,
+      level: levelVal,
+      startStar: startVal,
+      targetStar: targetVal,
+      baseCost: manVal * 10000,
+      count: countVal
+    };
 
     if (currentEditIdx >= 0) {
       state.items[currentEditIdx] = itemData;
@@ -721,7 +732,21 @@ function initEvents() {
 
     closeItemModal();
     runAnalysis();
+  }
+
+  // 장비 저장 폼 submit & 버튼 click 양방향 처리
+  document.getElementById('itemForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    saveItemFromModal();
   });
+
+  const btnSave = document.getElementById('btnSaveItem');
+  if (btnSave) {
+    btnSave.addEventListener('click', (e) => {
+      e.preventDefault();
+      saveItemFromModal();
+    });
+  }
 
   // 1. 텍스트 리포트 복사 (인벤/디스코드용)
   const btnCopy = document.getElementById('btnCopyTextReport');
