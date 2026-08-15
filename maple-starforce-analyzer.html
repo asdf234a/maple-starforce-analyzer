@@ -2611,7 +2611,7 @@ const STORAGE_KEY_PRESETS = 'maple_sf_custom_presets_v2';
  * 메소 단위를 '~억 ~만 메소'로 포맷팅
  * @param {number} amount - 순수 메소 금액
  */
-export function formatMeso(amount) {
+function formatMeso(amount) {
   if (!amount || isNaN(amount) || amount === 0) return '0 메소';
   const val = Math.round(Number(amount));
   
@@ -2634,7 +2634,7 @@ export function formatMeso(amount) {
  * 만 메소 단위 입력값(예: 32 -> 320,000 메소)을 한글로 포맷팅
  * @param {number} manVal - 만 메소 단위의 수치
  */
-export function formatManMeso(manVal) {
+function formatManMeso(manVal) {
   if (!manVal || isNaN(manVal) || manVal <= 0) return '0 메소';
   const valInMeso = Number(manVal) * 10000;
   return formatMeso(valInMeso);
@@ -3464,6 +3464,10 @@ function initEvents() {
       link.href = URL.createObjectURL(blob);
       link.download = `스타포스_강화분석_${new Date().toISOString().slice(0, 10)}.json`;
       link.click();
+    });
+  }
+}
+
 // 전역 헬퍼 노출 (인라인 및 외부 호출 완벽 지원)
 window.openItemModal = openItemModal;
 window.closeItemModal = closeItemModal;

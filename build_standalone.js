@@ -3,21 +3,24 @@ import fs from 'fs';
 const html = fs.readFileSync('index.html', 'utf-8');
 const css = fs.readFileSync('style.css', 'utf-8');
 
-const starforceData = fs.readFileSync('src/starforceData.js', 'utf-8')
-  .replace(/export\s+/g, '');
-const fftEngine = fs.readFileSync('src/fftEngine.js', 'utf-8')
-  .replace(/export\s+/g, '');
-const optimizer = fs.readFileSync('src/optimizer.js', 'utf-8')
-  .replace(/import\s+[^;]+;/g, '')
-  .replace(/export\s+/g, '');
-const markovEngine = fs.readFileSync('src/markovEngine.js', 'utf-8')
-  .replace(/import\s+[^;]+;/g, '')
-  .replace(/export\s+/g, '');
-const multiAnalyzer = fs.readFileSync('src/multiAnalyzer.js', 'utf-8')
-  .replace(/import\s+[^;]+;/g, '')
-  .replace(/export\s+/g, '');
-const appJs = fs.readFileSync('src/app.js', 'utf-8')
-  .replace(/import\s+[^;]+;/g, '');
+function cleanJs(code) {
+  return code
+    .replace(/import\s+[^;]+;/g, '')
+    .replace(/export\s+default\s+/g, '')
+    .replace(/export\s+class\s+/g, 'class ')
+    .replace(/export\s+function\s+/g, 'function ')
+    .replace(/export\s+const\s+/g, 'const ')
+    .replace(/export\s+let\s+/g, 'let ')
+    .replace(/export\s+var\s+/g, 'var ')
+    .replace(/export\s*\{[^}]*\};?/g, '');
+}
+
+const starforceData = cleanJs(fs.readFileSync('src/starforceData.js', 'utf-8'));
+const fftEngine = cleanJs(fs.readFileSync('src/fftEngine.js', 'utf-8'));
+const optimizer = cleanJs(fs.readFileSync('src/optimizer.js', 'utf-8'));
+const markovEngine = cleanJs(fs.readFileSync('src/markovEngine.js', 'utf-8'));
+const multiAnalyzer = cleanJs(fs.readFileSync('src/multiAnalyzer.js', 'utf-8'));
+const appJs = cleanJs(fs.readFileSync('src/app.js', 'utf-8'));
 
 const bundleJs = [
   starforceData,
