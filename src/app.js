@@ -751,7 +751,8 @@ function initEvents() {
       report += `• 상위 75%: ${formatMeso(result.percentiles.p75)}\n`;
       report += `• 상위 90% (추천 예산): ${formatMeso(result.percentiles.p90)}\n`;
       report += `• 상위 95%: ${formatMeso(result.percentiles.p95)}\n`;
-      report += `• 상위 99%: ${formatMeso(result.percentiles.p99)}\n`;
+      report += `• 상위 99%: ${formatMeso(result.percentiles.p99)}\n\n`;
+      report += `※ 본 분석기는 시뮬레이션 기반 확률 모델을 사용하므로 실제 수치와 약간의 오차가 존재할 수 있습니다.\n`;
 
       navigator.clipboard.writeText(report).then(() => {
         alert('📋 분석 리포트가 클립보드에 복사되었습니다!\n메이플 인벤, 디스코드, 메모장 등에 붙여넣기(Ctrl+V)하세요.');

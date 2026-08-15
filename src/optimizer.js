@@ -1,16 +1,16 @@
 /**
  * maple-starforce-analyzer - optimizer.js
- * starforce.gg/ev (https://starforce.gg/ev) 100% 동일 동적계획법(DP) 기반 강화 최적화 엔진
+ * 동적계획법(DP / Bellman Equation) 기반 강화 최적화 엔진
  * 
  * 각 성수별 [파괴방지 사용 / 확정복구 사용 / 12성 롤백] 중
- * 기댓값 비용이 최소가 되는 최적의 전략(Bellman Equation)을 도출합니다.
+ * 기댓값 비용이 최소가 되는 최적의 전략을 도출합니다.
  */
 
 import { STARFORCE_CONFIG, getCosts, getProbTable, getRestoreTotalCost } from './starforceData.js';
 
 export class StarforceOptimizer {
   /**
-   * starforce.gg의 getOptimalReinforcement 구현
+   * getOptimalReinforcement 구현
    * @param {Object} item - { level, baseCost }
    * @param {string|null} event - 이벤트
    * @param {number} mvpDiscount - MVP 할인율

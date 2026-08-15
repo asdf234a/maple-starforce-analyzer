@@ -4,7 +4,8 @@
 [![Update](https://img.shields.io/badge/MapleStory-2026_Starforce_Official-orange?style=for-the-badge)](https://asdf234a.github.io/maple-starforce-analyzer/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-> **메이플스토리 최신 스타포스 개편 시스템(하락 삭제 · 파괴 시 직전 성수 복구 메소 도입)** 기반의 단일 및 다중 장비 강화 비용 & 파괴 횟수 확률분포(PMF/CDF) 분석 웹 애플리케이션입니다.
+> **메이플스토리 최신 스타포스 개편 시스템(하락 0% 삭제 · 파괴 시 직전 성수 복구 메소 도입)** 기준의 단일 및 다중 장비 강화 비용 & 파괴 횟수 확률분포(PMF/CDF) 분석 웹 애플리케이션입니다.  
+> *(※ 본 분석기는 정밀 시뮬레이션 기반 확률 모델을 사용하므로 실제 수치와 약간의 오차가 존재할 수 있습니다)*
 
 ### 🌐 [👉 웹사이트 바로가기 (클릭하여 실행)](https://asdf234a.github.io/maple-starforce-analyzer/)
 
@@ -15,7 +16,7 @@
 ### 1. ⚡ FFT(고속 푸리에 변환) 기반 다중 아이템 결합 확률분포 분석
 - 단일 장비뿐만 아니라 **칠흑 5세트, 에테르넬 4세트, 아케인 5세트 등 다중 장비**를 동시에 강화할 때의 **총비용 결합 확률분포(PMF/CDF)**와 **총 파괴 횟수 분포**를 $O(N \log N)$ FFT 합성곱 엔진으로 **0.2초 이내**에 실시간 연산합니다.
 
-### 2. 🧠 동적 계획법(DP) 기반 강화 경로 자동 최적화 ([starforce.gg](https://starforce.gg) 100% 동일)
+### 2. 🧠 동적 계획법(DP) 기반 강화 경로 자동 최적화
 - 각 성수($15 \to 22$)별로 장비 레벨과 노작 가격, 이벤트 상태를 고려하여:
   - **15~17성**: `[파괴방지(+200%) / 확정복구(직전 성수) / 12성 롤백]` 3자 비교
   - **18~22성**: `[확정복구(직전 성수) / 12성 롤백]` 2자 비교
