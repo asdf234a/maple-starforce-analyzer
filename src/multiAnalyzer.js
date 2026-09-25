@@ -5,6 +5,8 @@
 
 import { MarkovEngine } from './markovEngine.js';
 import { FFTEngine } from './fftEngine.js';
+import { StarforceOptimizer } from './optimizer.js';
+import { DEFAULT_EVENT } from './starforceData.js';
 
 export class MultiAnalyzer {
   /**
@@ -33,18 +35,23 @@ export class MultiAnalyzer {
       return null;
     }
 
-    // 아이템들의 총 비용 규모에 따라 적절한 binSize 자동 산정 (기본 1천만 메소, 대규모는 5천만~1억 메소)
+    // 정확 기댓값 기준으로 binSize 자동 산정 (분포 배열이 약 2만 칸 내외가 되도록, 최소 1천만 메소)
+    const { event = DEFAULT_EVENT, mvpDiscount = 0, pcRoom = false } = options;
     let totalRoughCost = 0;
     items.forEach(it => {
-      const diff = Math.max(0, it.targetStar - it.startStar);
-      totalRoughCost += diff * 1500000000 * (it.count || 1);
+      if (it.startStar >= it.targetStar) return;
+      const exact = StarforceOptimizer.getExactMarkovExpectation(it, event, mvpDiscount, pcRoom);
+      totalRoughCost += exact.expCost * (it.count || 1);
     });
 
-    let binSize = 10000000; // 1,000만 메소
-    if (totalRoughCost > 500000000000) { // 5,000억 초과 시
-      binSize = 50000000; // 5,000만 메소
-    } else if (totalRoughCost > 200000000000) { // 2,000억 초과 시
-      binSize = 25000000; // 2,500만 메소
+    const MIN_BIN_SIZE = 10000000; // 1,000만 메소
+    const rawBin = totalRoughCost / 20000;
+    let binSize = MIN_BIN_SIZE;
+    if (rawBin > MIN_BIN_SIZE) {
+      // 1, 2, 5 × 10^n 단위로 올림
+      const exp = Math.pow(10, Math.floor(Math.log10(rawBin)));
+      const mant = rawBin / exp;
+      binSize = (mant <= 1 ? 1 : mant <= 2 ? 2 : mant <= 5 ? 5 : 10) * exp;
     }
 
     // 개별 아이템 분석

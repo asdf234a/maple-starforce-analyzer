@@ -1776,13 +1776,14 @@ const STARFORCE_CONFIG = {
     [0.105, 0.716, 0.179], // 23
     [0.105, 0.716, 0.179], // 24
     [0.105, 0.716, 0.179], // 25
-    [0.0735, 0.7416, 0.1853], // 26
+    [0.0735, 0.7412, 0.1853], // 26
     [0.0525, 0.758, 0.1895], // 27
     [0.0315, 0.7748, 0.1937], // 28
     [0.0105, 0.7916, 0.1979], // 29
   ],
 
-  // mesulive: restoreResourceTable [스페어 개수, 메소(억 단위)]
+  // restoreResourceTable [스페어 개수, 메소(억 단위)]
+  // 140/160/200/250제: 인게임 확인값 (starforce.gg/blog/ev-calculation-logic)
   restoreResourceTable: {
     130: {
       15: [1, 1.19], 16: [1, 2.87], 17: [1, 4.85], 18: [1, 11.03], 19: [2, 18.27], 20: [0, 0], 21: [0, 0], 22: [0, 0]
@@ -1791,7 +1792,7 @@ const STARFORCE_CONFIG = {
       15: [1, 1.33], 16: [1, 3.21], 17: [1, 5.42], 18: [1, 12.31], 19: [2, 20.43], 20: [0, 0], 21: [0, 0], 22: [0, 0]
     },
     140: {
-      15: [1, 1.48], 16: [1, 3.58], 17: [1, 6.05], 18: [1, 13.74], 19: [2, 22.79], 20: [2, 40.15], 21: [3, 50.45], 22: [4, 82.9]
+      15: [1, 1.49], 16: [1, 3.59], 17: [1, 6.06], 18: [1, 13.8], 19: [2, 22.8], 20: [2, 40.2], 21: [3, 50.5], 22: [4, 82.9]
     },
     145: {
       15: [1, 1.65], 16: [1, 3.98], 17: [1, 6.71], 18: [1, 15.28], 19: [2, 25.4], 20: [2, 44.5], 21: [3, 56.05], 22: [4, 92.25]
@@ -1800,13 +1801,13 @@ const STARFORCE_CONFIG = {
       15: [1, 1.83], 16: [1, 4.41], 17: [1, 7.45], 18: [1, 16.89], 19: [2, 28.03], 20: [2, 49.44], 21: [3, 62.24], 22: [4, 101.79]
     },
     160: {
-      15: [1, 2.22], 16: [1, 5.35], 17: [1, 9.03], 18: [1, 20.5], 19: [2, 34.02], 20: [2, 59.93], 21: [3, 75.31], 22: [4, 123.74]
+      15: [1, 2.22], 16: [1, 5.35], 17: [1, 9.04], 18: [1, 20.6], 19: [2, 34.1], 20: [2, 60], 21: [3, 75.4], 22: [4, 124]
     },
     200: {
-      15: [1, 4.33], 16: [1, 10.44], 17: [1, 17.64], 18: [1, 40.05], 19: [2, 66.44], 20: [2, 117.06], 21: [3, 147.09], 22: [4, 241.68]
+      15: [1, 4.33], 16: [1, 10.5], 17: [1, 17.7], 18: [1, 40.1], 19: [2, 66.5], 20: [2, 118], 21: [3, 148], 22: [4, 242]
     },
     250: {
-      15: [1, 8.46], 16: [1, 20.39], 17: [1, 34.46], 18: [1, 78.21], 19: [2, 129.77], 20: [2, 228.63], 21: [3, 287.28], 22: [4, 472.04]
+      15: [1, 8.46], 16: [1, 20.4], 17: [1, 34.5], 18: [1, 78.3], 19: [2, 130], 20: [2, 229], 21: [3, 288], 22: [4, 473]
     }
   }
 };
@@ -1837,50 +1838,91 @@ function getCosts(equipLevel) {
   });
 }
 
+const DEFAULT_EVENT = '샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인)';
+
 /**
- * mesulive: getProbTable(safeguardRecord, event)
+ * 이벤트 문자열 → 이벤트 효과 플래그
+ * - 샤이닝 스타포스(샤타) = 비용 30% 할인 + 21성 이하 파괴 30% 감소 + 흔적 복구 메소 20% 할인
+ */
+function parseEvent(event = null) {
+  const e = event || '';
+  const isShining = e.includes('샤이닝') || e.includes('샤타');
+  return {
+    costDiscount: isShining || e.includes('30% 할인') || e.includes('비용 할인') || e.includes('메소 할인'),
+    destroyReduction: isShining || e.includes('파괴'),
+    restoreDiscount: isShining || e.includes('흔적 복구'),
+    onePlusOneUnder10: e.includes('10성 이하 1+1'),
+    onePlusOne15: e.includes('1+1') && e.includes('15')
+  };
+}
+
+/**
+ * 성수별 1회 시도 비용
+ * - discounted: MVP·PC방(17성 미만) 및 30% 할인 이벤트가 곱셈으로 적용된 비용
+ * - protected: 파괴방지 ON 비용 (할인 비용 + 할인 전 비용 × 2)
+ */
+function getAttemptCosts(level, event = null, mvpDiscount = 0, pcRoom = false) {
+  const raw = getCosts(level);
+  const { costDiscount } = parseEvent(event);
+
+  const discounted = raw.map((cost, star) => {
+    let m = star < 17 ? 1 - mvpDiscount - (pcRoom ? 0.05 : 0) : 1;
+    if (costDiscount) m *= 0.7;
+    return Math.round(cost * m);
+  });
+
+  return {
+    raw,
+    discounted,
+    protected: discounted.map((cost, star) => cost + raw[star] * 2)
+  };
+}
+
+/**
+ * 성수별 [success, fail(유지), destroy] 확률표
+ * @param {Object} safeguardRecord - { [star]: true } 파괴방지 적용 성수 (15~17성만 유효)
  */
 function getProbTable(safeguardRecord = {}, event = null) {
-  const table = JSON.parse(JSON.stringify(STARFORCE_CONFIG.probTable));
+  const { destroyReduction, onePlusOne15 } = parseEvent(event);
 
-  // 파괴확률 30% 감소 이벤트
-  const isDestroyReduction = event !== null && (event.includes('파괴') || event.includes('샤이닝'));
+  return STARFORCE_CONFIG.probTable.map((row, star) => {
+    let [success, fail, destroy] = row;
 
-  if (isDestroyReduction) {
-    for (let i = 0; i < 22; i++) {
-      const destroyProb = table[i][2];
-      table[i][2] = destroyProb * 0.7;
-      table[i][1] += destroyProb * 0.3;
+    // 파괴확률 30% 감소 이벤트 (21성 이하)
+    if (destroyReduction && star <= 21) {
+      fail += destroy * 0.3;
+      destroy *= 0.7;
     }
-  }
 
-  // 파괴 방지 적용
-  return table.map((row, index) => {
-    const result = [...row];
-    if (safeguardRecord[index]) {
-      result[1] += result[2];
-      result[2] = 0;
+    // 15·16성 1+1 이벤트: 15 → 16 성공 보장
+    if (onePlusOne15 && star === 15) return [1, 0, 0];
+
+    // 파괴 방지 (15~17성)
+    if (safeguardRecord[star] && star >= 15 && star <= 17) {
+      fail += destroy;
+      destroy = 0;
     }
-    return result;
+
+    return [success, fail, destroy];
   });
 }
 
 const HUNDRED_MILLION = 100000000;
 
 /**
- * mesulive: getRestoreTotalCost({ level, star, spareCost, event })
+ * 확정복구 1회 총비용 (스페어 장비 + 흔적 복구 메소)
+ * - 15~22성: 해당 성수로 복구, 23성 이상: 22성으로 복구
  */
 function getRestoreTotalCost({ level, star, spareCost, event = null }) {
   const resByLevel = STARFORCE_CONFIG.restoreResourceTable[level];
-  if (!resByLevel || !resByLevel[star]) return null;
+  const restoreStar = Math.min(star, 22); // 22성 이상 파괴 시 22성으로 복구
+  if (!resByLevel || !resByLevel[restoreStar]) return null;
 
-  const [requiredSpareCount, restoreCostInHundredMillions] = resByLevel[star];
+  const [requiredSpareCount, restoreCostInHundredMillions] = resByLevel[restoreStar];
   if (requiredSpareCount <= 0 || restoreCostInHundredMillions <= 0) return null;
 
   const restoreCostMeso = Math.round(restoreCostInHundredMillions * HUNDRED_MILLION);
-  const hasRestoreDiscount = event !== null && (event.includes('흔적 복구') || event.includes('샤이닝'));
-
-  const discountRatio = hasRestoreDiscount ? 0.2 : 0;
+  const discountRatio = parseEvent(event).restoreDiscount ? 0.2 : 0;
   const discountedRestoreCostMeso = Math.round(restoreCostMeso * (1 - discountRatio));
 
   return {
@@ -2035,256 +2077,202 @@ class FFTEngine {
 
 /**
  * maple-starforce-analyzer - optimizer.js
- * 동적계획법(DP / Bellman Equation) 기반 강화 최적화 엔진
- * 
- * 12성 롤백 손실 = (baseCost + 12->s성 순수 강화 기댓값)
- * 확정 복구 손실 = (spareCount * baseCost + 할인된 복구 메소)
- * 파괴방지 비용 = 2 * 노할인 기본비용
- * 
- * 세 가지 전략 중 최소 비용 경로를 엄밀하게 도출합니다.
+ * 동적계획법(Bellman) 기반 스타포스 기댓값 & 최적 전략 엔진
+ * 참고: https://starforce.gg/blog/ev-calculation-logic
+ *
+ * 12성 이상 각 단계 s → s+1 의 기대값 (p: 성공, d: 파괴 확률, c: 1회 비용)
+ *   일반(12성 롤백) : (c + d · (노작값 + E[12 → s])) / p
+ *   파괴방지(15~17) : c_파방 / p
+ *   확정복구(15~22) : (c + d · Restore(s)) / p
+ *   확정복구(23~)   : (c + d · (Restore(22) + E[22 → s])) / p
+ * 단계마다 기대값이 가장 낮은 전략을 채택합니다.
+ * (각 단계의 선택은 이후 단계의 롤백 손실 E[12 → s]를 최소화하므로 단계별 최솟값이 곧 전역 최적입니다.)
+ *
+ * 파괴 횟수·소모 장비·시도 횟수·순수 강화비·복구비도 같은 재귀 구조로 계산합니다.
  */
 
 
 
+const ROLLBACK_STAR = 12;
+const RESTORE_CAP_STAR = 22;
+const MAX_STAR = 30;
+
+/**
+ * 지표별 (1회 시도 시 값, 파괴 시 손실 값)
+ * - cost: 총 기대 비용 / pure: 강화 메소 / recover: 노작·복구 비용
+ * - destroys: 파괴 횟수 / spares: 소모 장비 개수 / trials: 시도 횟수
+ */
+const METRICS = ['cost', 'pure', 'recover', 'destroys', 'spares', 'trials'];
+
+function attemptValues(attemptCost) {
+  return { cost: attemptCost, pure: attemptCost, recover: 0, destroys: 0, spares: 0, trials: 1 };
+}
+
+function rollbackLossValues(basePrice) {
+  return { cost: basePrice, pure: 0, recover: basePrice, destroys: 1, spares: 1, trials: 0 };
+}
+
+function restoreLossValues(restoreInfo) {
+  return {
+    cost: restoreInfo.totalCost,
+    pure: 0,
+    recover: restoreInfo.totalCost,
+    destroys: 1,
+    spares: restoreInfo.spareCount,
+    trials: 0
+  };
+}
+
 class StarforceOptimizer {
   /**
-   * getOptimalReinforcement
+   * 12성 → 30성 전 구간 최적 전략 및 12성 기준 누적 기댓값
    * @param {Object} item - { level, baseCost }
    * @param {string|null} event - 이벤트
-   * @param {number} mvpDiscount - MVP 할인율
+   * @param {number} mvpDiscount - MVP 할인율 (0.03 / 0.05 / 0.1)
    * @param {boolean} pcRoom - PC방 할인 여부
-   * @returns {Object}
    */
   static getOptimalReinforcement(item, event = null, mvpDiscount = 0, pcRoom = false) {
     const level = item.level;
-    const basePrice = item.baseCost; // 노작 장비 가격 (메소)
-    const defaultCosts = getCosts(level);
+    const basePrice = item.baseCost || 0;
+    const costs = getAttemptCosts(level, event, mvpDiscount, pcRoom);
+    const probTable = getProbTable({}, event);
+    const safeTable = getProbTable({ 15: true, 16: true, 17: true }, event);
 
-    // 할인율 계산
-    let discountRatio = mvpDiscount;
-    if (pcRoom) discountRatio += 0.05;
-
-    const isGlobalDiscount = event !== null && (event.includes('30%') || event.includes('샤이닝') || event.includes('샤타'));
-
-    const discountedCosts = defaultCosts.map((cost, index) => {
-      let c = index < 17 ? cost * (1 - discountRatio) : cost;
-      if (isGlobalDiscount) c *= 0.7;
-      return Math.round(c);
+    // cum[m][s] = 12성 → s성 누적 기댓값 (지표 m)
+    const cum = {};
+    METRICS.forEach(m => {
+      cum[m] = new Array(MAX_STAR + 1).fill(0);
     });
 
-    const isDestroyReduction = event !== null && (event.includes('파괴') || event.includes('샤이닝') || event.includes('샤타'));
+    const strategies = new Array(MAX_STAR).fill(null);
+    const optimalSafeguard = [];
+    const optimalRestore = [];
+    const stepDetails = [];
 
-    // 12성부터 현재 성수까지의 순수 누적 비용 L (12성 이전은 파괴 없음)
-    let cumulativeCost12ToCurrent = 0;
-    let cumulativeDestroys = 0;
-    let cumulativeTrials = 0;
+    for (let s = ROLLBACK_STAR; s < MAX_STAR; s++) {
+      const [pSuccess, , pDestroy] = probTable[s];
+      const attempt = attemptValues(costs.discounted[s]);
 
-    // 12 ~ 14성 구간
-    for (let s = 12; s < 15; s++) {
-      const pSuccess = STARFORCE_CONFIG.probTable[s][0];
-      const stepCost = discountedCosts[s] / pSuccess;
-      cumulativeCost12ToCurrent += stepCost;
-      cumulativeTrials += 1 / pSuccess;
-    }
+      const step = (att, p, d, lossOf) => {
+        const values = {};
+        METRICS.forEach(m => {
+          values[m] = (att[m] + d * lossOf(m)) / p;
+        });
+        return values;
+      };
 
-    const optimalSafeguard = []; // 파괴방지 권장 성수 목록 [15, 16, 17]
-    const optimalRestore = [];   // 확정복구 권장 성수 목록 [15..22]
-    const stepDetails = [];      // 각 성수별 세부 비교 데이터
+      // 1) 일반 진행 (파괴 시 12성 롤백)
+      const rollbackLoss = rollbackLossValues(basePrice);
+      const candidates = [{
+        strategy: 'rollback',
+        values: step(attempt, pSuccess, pDestroy, m => rollbackLoss[m] + cum[m][s])
+      }];
 
-    // 15 ~ 17성 구간 (파괴방지 vs 확정복구 vs 12성 롤백 3자 비교)
-    for (let s = 15; s <= 17; s++) {
-      const baseProb = STARFORCE_CONFIG.probTable[s];
-      const rawSuccess = baseProb[0];
-      const rawDestroy = isDestroyReduction ? baseProb[2] * 0.7 : baseProb[2];
-
-      const normalCost = discountedCosts[s];
-      const safeguardCost = normalCost + defaultCosts[s] * 2;
-
-      // 1) 파괴방지 사용 시
-      const costSafe = safeguardCost / rawSuccess;
-
-      // 2) 확정 복구 사용 시 (직전 성수 복구)
-      const restoreInfo = getRestoreTotalCost({ level, star: s, spareCost: basePrice, event });
-      const restoreLoss = restoreInfo ? restoreInfo.totalCost : Infinity;
-      const costRestore = (normalCost + rawDestroy * restoreLoss) / rawSuccess;
-
-      // 3) 12성 롤백 복구 사용 시
-      const rollbackLoss = basePrice + cumulativeCost12ToCurrent;
-      const costRollback = (normalCost + rawDestroy * rollbackLoss) / rawSuccess;
-
-      let chosenStrategy = 'rollback';
-      let minCost = costRollback;
-      let stepDestroys = rawDestroy / rawSuccess;
-
-      // 15성은 복구비가 롤백보다 저렴하면 채택, 16~17성은 5% 이상 유의미하게 저렴할 때만 채택
-      const isRestoreValid = (s === 15) ? (restoreLoss < rollbackLoss) : (restoreLoss < rollbackLoss * 0.95);
-
-      if (costSafe <= costRestore && costSafe <= costRollback) {
-        chosenStrategy = 'safeguard';
-        minCost = costSafe;
-        stepDestroys = 0;
-        optimalSafeguard.push(s);
-      } else if (isRestoreValid) {
-        chosenStrategy = 'restore';
-        minCost = costRestore;
-        optimalRestore.push(s);
+      // 2) 파괴방지 (15~17성)
+      if (s >= 15 && s <= 17 && pDestroy > 0) {
+        const [pSafeSuccess, , pSafeDestroy] = safeTable[s];
+        candidates.push({
+          strategy: 'safeguard',
+          values: step(attemptValues(costs.protected[s]), pSafeSuccess, pSafeDestroy, () => 0)
+        });
       }
 
-      cumulativeCost12ToCurrent += minCost;
-      cumulativeDestroys += stepDestroys;
-      cumulativeTrials += (1 + (chosenStrategy === 'safeguard' ? 0 : rawDestroy * (chosenStrategy === 'restore' ? 0 : cumulativeTrials))) / rawSuccess;
+      // 3) 확정복구 (15~22성: 해당 성수, 23성~: 22성으로 복구)
+      const restoreInfo = s >= 15
+        ? getRestoreTotalCost({ level, star: s, spareCost: basePrice, event })
+        : null;
+      if (restoreInfo && pDestroy > 0) {
+        const restoreLoss = restoreLossValues(restoreInfo);
+        const lossOf = s <= RESTORE_CAP_STAR
+          ? m => restoreLoss[m]
+          : m => restoreLoss[m] + cum[m][s] - cum[m][RESTORE_CAP_STAR];
+        candidates.push({ strategy: 'restore', values: step(attempt, pSuccess, pDestroy, lossOf) });
+      }
 
-      stepDetails.push({
-        star: s,
-        strategy: chosenStrategy,
-        minCost,
-        cumulativeCost: cumulativeCost12ToCurrent,
-        cumulativeDestroys,
-        costSafe,
-        costRestore,
-        costRollback,
-        restoreValue: restoreLoss,
-        rollbackValue: rollbackLoss
+      const chosen = candidates.reduce((best, c) => (c.values.cost < best.values.cost ? c : best));
+      strategies[s] = chosen.strategy;
+      if (chosen.strategy === 'safeguard') optimalSafeguard.push(s);
+      if (chosen.strategy === 'restore') optimalRestore.push(s);
+
+      METRICS.forEach(m => {
+        cum[m][s + 1] = cum[m][s] + chosen.values[m];
       });
-    }
 
-    // 18 ~ 22성 구간 (확정복구 vs 12성 롤백 2자 비교)
-    for (let s = 18; s <= 22; s++) {
-      const baseProb = STARFORCE_CONFIG.probTable[s];
-      const rawSuccess = baseProb[0];
-      const rawDestroy = (isDestroyReduction && s <= 21) ? baseProb[2] * 0.7 : baseProb[2];
-      const normalCost = discountedCosts[s];
-
-      const restoreInfo = getRestoreTotalCost({ level, star: s, spareCost: basePrice, event });
-      const restoreLoss = restoreInfo ? restoreInfo.totalCost : Infinity;
-      const rollbackLoss = basePrice + cumulativeCost12ToCurrent;
-
-      const costRestore = (normalCost + rawDestroy * restoreLoss) / rawSuccess;
-      const costRollback = (normalCost + rawDestroy * rollbackLoss) / rawSuccess;
-
-      // 18성 이상에서는 스페어가 2~4개 소모되므로, 복구 손실이 롤백 손실보다 최소 5% 이상 확실히 저렴할 때만 채택
-      const isRestoreBetter = (restoreLoss < rollbackLoss * 0.95);
-      const minCost = isRestoreBetter ? costRestore : costRollback;
-
-      if (isRestoreBetter) {
-        optimalRestore.push(s);
-      }
-
-      cumulativeCost12ToCurrent += minCost;
-      cumulativeDestroys += rawDestroy / rawSuccess;
-      cumulativeTrials += (1 + (isRestoreBetter ? 0 : rawDestroy * cumulativeTrials)) / rawSuccess;
-
+      const costOf = name => {
+        const c = candidates.find(x => x.strategy === name);
+        return c ? c.values.cost : null;
+      };
       stepDetails.push({
         star: s,
-        strategy: isRestoreBetter ? 'restore' : 'rollback',
-        minCost,
-        cumulativeCost: cumulativeCost12ToCurrent,
-        cumulativeDestroys,
-        costSafe: null,
-        costRestore,
-        costRollback,
-        restoreValue: restoreLoss,
-        rollbackValue: rollbackLoss
+        strategy: chosen.strategy,
+        minCost: chosen.values.cost,
+        cumulativeCost: cum.cost[s + 1],
+        cumulativeDestroys: cum.destroys[s + 1],
+        costSafe: costOf('safeguard'),
+        costRestore: costOf('restore'),
+        costRollback: costOf('rollback'),
+        restoreValue: restoreInfo ? restoreInfo.totalCost : null,
+        rollbackValue: basePrice + cum.cost[s]
       });
     }
 
     return {
       destroyPrevention: optimalSafeguard,
       restore: optimalRestore,
+      strategies,
       stepDetails,
-      cumulativeCost12ToCurrent
+      cumulative: cum,
+      cumulativeCost12ToCurrent: cum.cost
     };
   }
 
   /**
-   * 시작 성수부터 목표 성수까지의 수학적 마르코프 정확 기댓값 계산
+   * 시작 성수 → 목표 성수 정확 기댓값
+   * - 12성 이상: E[N → M] = E[12 → M] − E[12 → N]
+   * - 12성 미만: 파괴가 없으므로 단계별 c/p 합 (10성 이하 1+1 이벤트는 2단계 점프 반영)
    */
   static getExactMarkovExpectation(item, event = null, mvpDiscount = 0, pcRoom = false) {
     const opt = this.getOptimalReinforcement(item, event, mvpDiscount, pcRoom);
-    const { startStar = 0, targetStar = 22, level, baseCost } = item;
-    const defaultCosts = getCosts(level);
+    const { level } = item;
+    const startStar = Math.max(0, item.startStar ?? 0);
+    const targetStar = Math.min(MAX_STAR, item.targetStar ?? 22);
+    const costs = getAttemptCosts(level, event, mvpDiscount, pcRoom);
+    const probTable = getProbTable({}, event);
+    const { onePlusOneUnder10 } = parseEvent(event);
 
-    let discountRatio = mvpDiscount;
-    if (pcRoom) discountRatio += 0.05;
-    const isGlobalDiscount = event !== null && (event.includes('30%') || event.includes('샤이닝') || event.includes('샤타'));
-    const discountedCosts = defaultCosts.map((cost, index) => {
-      let c = index < 17 ? cost * (1 - discountRatio) : cost;
-      if (isGlobalDiscount) c *= 0.7;
-      return Math.round(c);
-    });
+    const cum = opt.cumulative;
+    const memo = new Map();
 
-    const isDestroyReduction = event !== null && (event.includes('파괴') || event.includes('샤이닝') || event.includes('샤타'));
-
-    let totalCost = 0;
-    let totalDestroys = 0;
-    let totalTrials = 0;
-
-    // 0~11성에서 목표성수로 갈 때
-    for (let s = startStar; s < Math.min(targetStar, 12); s++) {
-      const pSuccess = STARFORCE_CONFIG.probTable[s][0];
-      totalCost += discountedCosts[s] / pSuccess;
-      totalTrials += 1 / pSuccess;
-    }
-
-    // 12성부터 각 성수까지의 마르코프 누적 파괴수 D 계산
-    const D = new Array(30).fill(0);
-    // 12~14성은 파괴 0
-
-    let cum12 = 0;
-    for (let s = 12; s < 15; s++) {
-      const pSuccess = STARFORCE_CONFIG.probTable[s][0];
-      const stepCost = discountedCosts[s] / pSuccess;
-      cum12 += stepCost;
-      if (s >= startStar && s < targetStar) {
-        totalCost += stepCost;
-        totalTrials += 1 / pSuccess;
+    // valueFrom(s)[m] = s성 → 목표 성수 기댓값
+    const valueFrom = s => {
+      const result = {};
+      if (s >= targetStar) {
+        METRICS.forEach(m => { result[m] = 0; });
+        return result;
       }
-    }
-
-    for (let s = 15; s < 25; s++) {
-      const baseProb = STARFORCE_CONFIG.probTable[s];
-      const rawSuccess = baseProb[0];
-      const rawDestroy = (isDestroyReduction && s <= 21) ? baseProb[2] * 0.7 : baseProb[2];
-      const normalCost = discountedCosts[s];
-
-      const isSafe = opt.destroyPrevention.includes(s);
-      const isRest = opt.restore.includes(s);
-
-      let stepCost = 0;
-      let stepDest = 0;
-
-      if (isSafe) {
-        stepCost = (normalCost + defaultCosts[s] * 2) / rawSuccess;
-        stepDest = 0;
-      } else if (isRest) {
-        const restoreInfo = getRestoreTotalCost({ level, star: s, spareCost: baseCost, event });
-        const restoreLoss = restoreInfo ? restoreInfo.totalCost : Infinity;
-        stepCost = (normalCost + rawDestroy * restoreLoss) / rawSuccess;
-        stepDest = (rawDestroy / rawSuccess) * (restoreInfo ? restoreInfo.spareCount : 1);
-      } else {
-        const rollbackLoss = baseCost + cum12;
-        stepCost = (normalCost + rawDestroy * rollbackLoss) / rawSuccess;
-        // 12성 롤백 시 1회 파괴당 새 장비 1개 + 12성에서 s성까지 올라오는 누적 파괴 D[s] 추가 발생!
-        stepDest = (rawDestroy / rawSuccess) * (1 + D[s]);
+      if (s >= ROLLBACK_STAR) {
+        METRICS.forEach(m => { result[m] = cum[m][targetStar] - cum[m][s]; });
+        return result;
       }
+      if (memo.has(s)) return memo.get(s);
 
-      cum12 += stepCost;
-      D[s + 1] = D[s] + stepDest;
+      const pSuccess = probTable[s][0];
+      const next = valueFrom(s + 1 + (onePlusOneUnder10 && s <= 10 ? 1 : 0));
+      const att = attemptValues(costs.discounted[s]);
+      METRICS.forEach(m => { result[m] = att[m] / pSuccess + next[m]; });
+      memo.set(s, result);
+      return result;
+    };
 
-      if (s >= startStar && s < targetStar) {
-        totalCost += stepCost;
-        totalTrials += 1 / rawSuccess;
-      }
-    }
-
-    // 시작 성수에서 목표 성수까지의 실제 기대 파괴 장비 수
-    const startIdx = Math.max(12, startStar);
-    totalDestroys = (targetStar > startIdx) ? (D[targetStar] - D[startIdx]) : 0;
+    const v = valueFrom(startStar);
 
     return {
-      expCost: totalCost,
-      expDestroys: totalDestroys,
-      expTrials: totalTrials,
+      expCost: v.cost,
+      expPureCost: v.pure,
+      expRecoverCost: v.recover,
+      expDestroyCount: v.destroys,
+      expDestroys: v.spares,
+      expTrials: v.trials,
       optimal: opt
     };
   }
@@ -2326,6 +2314,7 @@ class MarkovEngine {
         expPureCost: 0,
         expRecoverCost: 0,
         expDestroys: 0,
+        expDestroyCount: 0,
         expTrials: 0,
         costPMF: new Float64Array([1]),
         destroyPMF: new Float64Array([1]),
@@ -2334,7 +2323,7 @@ class MarkovEngine {
     }
 
     const {
-      event = '샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인)',
+      event = DEFAULT_EVENT,
       autoOptimize = true,
       mvpDiscount = 0,
       pcRoom = false
@@ -2342,118 +2331,60 @@ class MarkovEngine {
 
     // 수학적 마르코프 최적화 및 정확 기댓값 산출
     const exactResult = StarforceOptimizer.getExactMarkovExpectation(item, event, mvpDiscount, pcRoom);
-    const optimal = exactResult.optimal;
+    const strategies = exactResult.optimal.strategies;
 
-    const safeguardRecord = {
-      15: optimal.destroyPrevention.includes(15),
-      16: optimal.destroyPrevention.includes(16),
-      17: optimal.destroyPrevention.includes(17)
-    };
-
-    const restoreRecord = {};
-    for (let s = 15; s <= 22; s++) {
-      restoreRecord[s] = optimal.restore.includes(s);
-    }
+    const safeguardRecord = {};
+    exactResult.optimal.destroyPrevention.forEach(s => { safeguardRecord[s] = true; });
 
     const probTable = getProbTable(safeguardRecord, event);
-    const defaultCosts = getCosts(level);
+    const costs = getAttemptCosts(level, event, mvpDiscount, pcRoom);
+    const { onePlusOneUnder10 } = parseEvent(event);
 
-    // 할인율 계산
-    let discountRatio = mvpDiscount;
-    if (pcRoom) discountRatio += 0.05;
-    const isGlobalDiscount = event !== null && (event.includes('30%') || event.includes('샤이닝') || event.includes('샤타'));
-
-    const discountedCosts = defaultCosts.map((cost, index) => {
-      let c = index < 17 ? cost * (1 - discountRatio) : cost;
-      if (isGlobalDiscount) c *= 0.7;
-      return Math.round(c);
+    const restoreInfos = {};
+    exactResult.optimal.restore.forEach(s => {
+      restoreInfos[s] = getRestoreTotalCost({ level, star: s, spareCost: baseCost, event });
     });
 
-    const isOnePlusOneEvent = event === '10성 이하 1+1';
-
-    let totalSpentCost = 0;
-    let totalPureCost = 0;
-    let totalRecoverCost = 0;
-    let totalConsumedEquips = 0;
-    let totalTrials = 0;
+    // 기대 시도 횟수가 매우 큰 구간(26성 이상 등)은 시뮬레이션 총 시도 수를 제한해 UI 멈춤 방지
+    const MAX_TOTAL_TRIALS = 2e7;
+    const simCount = Math.max(1, Math.min(simulationCount, Math.floor(MAX_TOTAL_TRIALS / Math.max(1, exactResult.expTrials))));
 
     const costMap = new Map();
     const destroyMap = new Map();
 
-    for (let sim = 0; sim < simulationCount; sim++) {
+    for (let sim = 0; sim < simCount; sim++) {
       let star = startStar;
       let spentCost = 0;
-      let pureCost = 0;
-      let recoverCost = 0;
       let consumedEquipCount = 0;
-      let trials = 0;
 
       while (star < targetStar) {
-        trials++;
-        const probabilities = probTable[star];
-        const isDecided = probabilities[0] === 1.0;
+        const [pSuccess, pMaintain] = probTable[star];
+        spentCost += safeguardRecord[star] ? costs.protected[star] : costs.discounted[star];
 
-        const isProtected = safeguardRecord[`${star}`] && !isDecided;
-        const stepCost = discountedCosts[star] + (isProtected ? defaultCosts[star] * 2 : 0);
-
-        spentCost += stepCost;
-        pureCost += stepCost;
-
-        if (isDecided) {
-          star += 1;
+        const r = Math.random();
+        if (r < pSuccess) {
+          star += 1 + (onePlusOneUnder10 && star <= 10 ? 1 : 0);
+        } else if (r < pSuccess + pMaintain) {
+          // 유지
+        } else if (strategies[star] === 'restore') {
+          // 확정복구: 15~22성은 해당 성수, 23성 이상은 22성으로 복구
+          const restoreInfo = restoreInfos[star];
+          consumedEquipCount += restoreInfo.spareCount;
+          spentCost += restoreInfo.totalCost;
+          star = Math.min(star, 22);
         } else {
-          const r = Math.random();
-          const pSuccess = probabilities[0];
-          const pMaintain = probabilities[1];
-
-          if (r < pSuccess) {
-            star += 1 + (isOnePlusOneEvent && star <= 10 ? 1 : 0);
-          } else if (r < pSuccess + pMaintain) {
-            // 유지
-          } else {
-            // 파괴
-            const isRestore = restoreRecord[star];
-
-            if (isRestore) {
-              // 직전 성수 복구
-              const restoreInfo = getRestoreTotalCost({
-                level,
-                star,
-                spareCost: baseCost,
-                event
-              });
-              if (restoreInfo) {
-                consumedEquipCount += restoreInfo.spareCount;
-                spentCost += restoreInfo.totalCost;
-                recoverCost += restoreInfo.totalCost;
-              } else {
-                consumedEquipCount += 1;
-                spentCost += baseCost;
-                recoverCost += baseCost;
-                star = 12;
-              }
-            } else {
-              // 12성 롤백 복구
-              consumedEquipCount += 1;
-              spentCost += baseCost;
-              recoverCost += baseCost;
-              star = 12;
-            }
-          }
+          // 12성 롤백 복구
+          consumedEquipCount += 1;
+          spentCost += baseCost;
+          star = 12;
         }
       }
-
-      totalSpentCost += spentCost;
-      totalPureCost += pureCost;
-      totalRecoverCost += recoverCost;
-      totalConsumedEquips += consumedEquipCount;
-      totalTrials += trials;
 
       // 비용 히스토그램 Binning
       const binIdx = Math.floor(spentCost / binSize);
       costMap.set(binIdx, (costMap.get(binIdx) || 0) + 1);
 
-      // 파괴 횟수 히스토그램
+      // 소모 장비 히스토그램
       destroyMap.set(consumedEquipCount, (destroyMap.get(consumedEquipCount) || 0) + 1);
     }
 
@@ -2464,7 +2395,7 @@ class MarkovEngine {
     }
     const costPMF = new Float64Array(maxBin + 1);
     for (let i = 0; i <= maxBin; i++) {
-      costPMF[i] = (costMap.get(i) || 0) / simulationCount;
+      costPMF[i] = (costMap.get(i) || 0) / simCount;
     }
 
     let maxDest = 0;
@@ -2473,7 +2404,7 @@ class MarkovEngine {
     }
     const destroyPMF = new Float64Array(maxDest + 1);
     for (let i = 0; i <= maxDest; i++) {
-      destroyPMF[i] = (destroyMap.get(i) || 0) / simulationCount;
+      destroyPMF[i] = (destroyMap.get(i) || 0) / simCount;
     }
 
     // 수량(count) 배수 적용
@@ -2481,11 +2412,13 @@ class MarkovEngine {
       item,
       name,
       count,
-      expCost: exactResult.expCost * count, // 수학적 정확 기댓값 적용
-      expPureCost: (totalPureCost / simulationCount) * count,
-      expRecoverCost: (totalRecoverCost / simulationCount) * count,
-      expDestroys: exactResult.expDestroys * count, // 수학적 정확 파괴수 적용
+      expCost: exactResult.expCost * count, // 수학적 정확 기댓값
+      expPureCost: exactResult.expPureCost * count,
+      expRecoverCost: exactResult.expRecoverCost * count,
+      expDestroys: exactResult.expDestroys * count, // 기대 소모 장비 개수 (확정복구 스페어 포함)
+      expDestroyCount: exactResult.expDestroyCount * count, // 기대 파괴 횟수
       expTrials: exactResult.expTrials * count,
+      simulationCount: simCount,
       costPMF,
       destroyPMF,
       binSize
@@ -2498,6 +2431,8 @@ class MarkovEngine {
  * maple-starforce-analyzer - multiAnalyzer.js
  * 여러 개 아이템의 강화 비용 & 파괴 횟수 결합 분포 분석기
  */
+
+
 
 
 
@@ -2529,18 +2464,23 @@ class MultiAnalyzer {
       return null;
     }
 
-    // 아이템들의 총 비용 규모에 따라 적절한 binSize 자동 산정 (기본 1천만 메소, 대규모는 5천만~1억 메소)
+    // 정확 기댓값 기준으로 binSize 자동 산정 (분포 배열이 약 2만 칸 내외가 되도록, 최소 1천만 메소)
+    const { event = DEFAULT_EVENT, mvpDiscount = 0, pcRoom = false } = options;
     let totalRoughCost = 0;
     items.forEach(it => {
-      const diff = Math.max(0, it.targetStar - it.startStar);
-      totalRoughCost += diff * 1500000000 * (it.count || 1);
+      if (it.startStar >= it.targetStar) return;
+      const exact = StarforceOptimizer.getExactMarkovExpectation(it, event, mvpDiscount, pcRoom);
+      totalRoughCost += exact.expCost * (it.count || 1);
     });
 
-    let binSize = 10000000; // 1,000만 메소
-    if (totalRoughCost > 500000000000) { // 5,000억 초과 시
-      binSize = 50000000; // 5,000만 메소
-    } else if (totalRoughCost > 200000000000) { // 2,000억 초과 시
-      binSize = 25000000; // 2,500만 메소
+    const MIN_BIN_SIZE = 10000000; // 1,000만 메소
+    const rawBin = totalRoughCost / 20000;
+    let binSize = MIN_BIN_SIZE;
+    if (rawBin > MIN_BIN_SIZE) {
+      // 1, 2, 5 × 10^n 단위로 올림
+      const exp = Math.pow(10, Math.floor(Math.log10(rawBin)));
+      const mant = rawBin / exp;
+      binSize = (mant <= 1 ? 1 : mant <= 2 ? 2 : mant <= 5 ? 5 : 10) * exp;
     }
 
     // 개별 아이템 분석
@@ -3093,7 +3033,7 @@ function renderTables(result) {
       return `<span class="strategy-badge ${isSafe ? 'safe-on' : 'safe-off'}">${s}성 ${isSafe ? '🛡️파방' : '파방X'}</span>`;
     }).join('');
 
-    // 15~22성 복구 전략 텍스트
+    // 15성 이상 확정복구 전략 텍스트 (23성 이상은 22성으로 복구)
     const restoreBadges = (optimal.restore.length > 0)
       ? `<span class="strategy-badge restore-on">✨확정복구 (${optimal.restore.join(',')}성)</span>`
       : `<span class="strategy-badge restore-off">🔄12성 롤백</span>`;
@@ -3116,7 +3056,7 @@ function renderTables(result) {
         </td>
         <td>
           <span style="color:#ff7b72; font-weight:700;">${r.expDestroys.toFixed(3)}개</span>
-          <div style="font-size:11px; color:#8b949e;">평균 ${r.expTrials ? r.expTrials.toFixed(1) : '0'}회 시도</div>
+          <div style="font-size:11px; color:#8b949e;">파괴 ${(r.expDestroyCount || 0).toFixed(3)}회 · 평균 ${r.expTrials ? r.expTrials.toFixed(1) : '0'}회 시도</div>
         </td>
       </tr>
     `;

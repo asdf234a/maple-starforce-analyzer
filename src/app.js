@@ -455,7 +455,7 @@ function renderTables(result) {
       return `<span class="strategy-badge ${isSafe ? 'safe-on' : 'safe-off'}">${s}성 ${isSafe ? '🛡️파방' : '파방X'}</span>`;
     }).join('');
 
-    // 15~22성 복구 전략 텍스트
+    // 15성 이상 확정복구 전략 텍스트 (23성 이상은 22성으로 복구)
     const restoreBadges = (optimal.restore.length > 0)
       ? `<span class="strategy-badge restore-on">✨확정복구 (${optimal.restore.join(',')}성)</span>`
       : `<span class="strategy-badge restore-off">🔄12성 롤백</span>`;
@@ -478,7 +478,7 @@ function renderTables(result) {
         </td>
         <td>
           <span style="color:#ff7b72; font-weight:700;">${r.expDestroys.toFixed(3)}개</span>
-          <div style="font-size:11px; color:#8b949e;">평균 ${r.expTrials ? r.expTrials.toFixed(1) : '0'}회 시도</div>
+          <div style="font-size:11px; color:#8b949e;">파괴 ${(r.expDestroyCount || 0).toFixed(3)}회 · 평균 ${r.expTrials ? r.expTrials.toFixed(1) : '0'}회 시도</div>
         </td>
       </tr>
     `;
