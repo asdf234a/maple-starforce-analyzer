@@ -3,7 +3,7 @@
  * 마르코프 해석적 기댓값 및 고정밀 몬테카를로 PMF 생성 엔진
  */
 
-import { STARFORCE_CONFIG, getCosts, getProbTable, getRestoreTotalCost } from './starforceData.js';
+import { DEFAULT_EVENT, getAttemptCosts, getProbTable, getRestoreTotalCost, parseEvent } from './starforceData.js';
 import { StarforceOptimizer } from './optimizer.js';
 
 export class MarkovEngine {
@@ -33,6 +33,7 @@ export class MarkovEngine {
         expPureCost: 0,
         expRecoverCost: 0,
         expDestroys: 0,
+        expDestroyCount: 0,
         expTrials: 0,
         costPMF: new Float64Array([1]),
         destroyPMF: new Float64Array([1]),
@@ -41,7 +42,7 @@ export class MarkovEngine {
     }
 
     const {
-      event = '샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인)',
+      event = DEFAULT_EVENT,
       autoOptimize = true,
       mvpDiscount = 0,
       pcRoom = false
@@ -49,118 +50,130 @@ export class MarkovEngine {
 
     // 수학적 마르코프 최적화 및 정확 기댓값 산출
     const exactResult = StarforceOptimizer.getExactMarkovExpectation(item, event, mvpDiscount, pcRoom);
-    const optimal = exactResult.optimal;
+    const strategies = exactResult.optimal.strategies;
 
-    const safeguardRecord = {
-      15: optimal.destroyPrevention.includes(15),
-      16: optimal.destroyPrevention.includes(16),
-      17: optimal.destroyPrevention.includes(17)
-    };
-
-    const restoreRecord = {};
-    for (let s = 15; s <= 22; s++) {
-      restoreRecord[s] = optimal.restore.includes(s);
-    }
+    const safeguardRecord = {};
+    exactResult.optimal.destroyPrevention.forEach(s => { safeguardRecord[s] = true; });
 
     const probTable = getProbTable(safeguardRecord, event);
-    const defaultCosts = getCosts(level);
+    const costs = getAttemptCosts(level, event, mvpDiscount, pcRoom);
+    const { onePlusOneUnder10 } = parseEvent(event);
 
-    // 할인율 계산
-    let discountRatio = mvpDiscount;
-    if (pcRoom) discountRatio += 0.05;
-    const isGlobalDiscount = event !== null && (event.includes('30%') || event.includes('샤이닝') || event.includes('샤타'));
-
-    const discountedCosts = defaultCosts.map((cost, index) => {
-      let c = index < 17 ? cost * (1 - discountRatio) : cost;
-      if (isGlobalDiscount) c *= 0.7;
-      return Math.round(c);
+    const restoreInfos = {};
+    exactResult.optimal.restore.forEach(s => {
+      restoreInfos[s] = getRestoreTotalCost({ level, star: s, spareCost: baseCost, event });
     });
 
-    const isOnePlusOneEvent = event === '10성 이하 1+1';
+    // 계층적 샘플링
+    // 파괴 후 12성(또는 23성 이상 확정복구 시 22성)부터 다시 올라오는 비용을 매번 새로 시뮬레이션하면
+    // 연산량이 기대 시도 횟수에 비례해 30성 목표에서는 수천만 번이 됩니다.
+    // 대신 "12성 → s성" / "22성 → s성" 비용 표본 풀을 아래 단계부터 쌓아 두고, 파괴 시 풀에서 무작위로 뽑아 더합니다.
+    // (X_{12→s+1} = X_{12→s} + 체류 비용(s), 체류 중 파괴 시 노작값 + 독립 표본 X_{12→s})
+    // 연산량은 표본 수 × Σ(1/성공확률) 수준으로 목표 성수와 무관하게 일정합니다.
+    const simCount = Math.max(1, simulationCount);
+    const randomIndex = () => Math.floor(Math.random() * simCount);
 
-    let totalSpentCost = 0;
-    let totalPureCost = 0;
-    let totalRecoverCost = 0;
-    let totalConsumedEquips = 0;
-    let totalTrials = 0;
+    const pool12Cost = [];
+    const pool12Spare = [];
+    const pool22Cost = [];
+    const pool22Spare = [];
+
+    let spareAcc = 0;
+
+    // s성 → s+1성 성공까지의 비용 표본 (소모 장비는 spareAcc에 누적)
+    const sojourn = (s) => {
+      const [pSuccess, pMaintain] = probTable[s];
+      const attemptCost = safeguardRecord[s] ? costs.protected[s] : costs.discounted[s];
+      const restoreInfo = strategies[s] === 'restore' ? restoreInfos[s] : null;
+      let cost = 0;
+
+      for (;;) {
+        cost += attemptCost;
+        const r = Math.random();
+        if (r < pSuccess) return cost;
+        if (r < pSuccess + pMaintain) continue; // 유지
+
+        if (restoreInfo) {
+          // 확정복구: 15~22성은 해당 성수, 23성 이상은 22성으로 복구 후 재상승
+          cost += restoreInfo.totalCost;
+          spareAcc += restoreInfo.spareCount;
+          if (s > 22) {
+            const j = randomIndex();
+            cost += pool22Cost[s][j];
+            spareAcc += pool22Spare[s][j];
+          }
+        } else {
+          // 12성 롤백: 노작값 + 12성 → s성 재상승
+          const j = randomIndex();
+          cost += baseCost + pool12Cost[s][j];
+          spareAcc += 1 + pool12Spare[s][j];
+        }
+      }
+    };
+
+    // 표본 풀 구축 (12성 → s성, 22성 → s성)
+    if (targetStar > 12) {
+      pool12Cost[12] = new Float64Array(simCount);
+      pool12Spare[12] = new Float64Array(simCount);
+
+      for (let s = 12; s < targetStar - 1; s++) {
+        if (s === 22) {
+          pool22Cost[22] = new Float64Array(simCount);
+          pool22Spare[22] = new Float64Array(simCount);
+        }
+
+        const nextCost = new Float64Array(simCount);
+        const nextSpare = new Float64Array(simCount);
+        for (let i = 0; i < simCount; i++) {
+          spareAcc = 0;
+          nextCost[i] = pool12Cost[s][i] + sojourn(s);
+          nextSpare[i] = pool12Spare[s][i] + spareAcc;
+        }
+        pool12Cost[s + 1] = nextCost;
+        pool12Spare[s + 1] = nextSpare;
+
+        if (s >= 22) {
+          const next22Cost = new Float64Array(simCount);
+          const next22Spare = new Float64Array(simCount);
+          for (let i = 0; i < simCount; i++) {
+            spareAcc = 0;
+            next22Cost[i] = pool22Cost[s][i] + sojourn(s);
+            next22Spare[i] = pool22Spare[s][i] + spareAcc;
+          }
+          pool22Cost[s + 1] = next22Cost;
+          pool22Spare[s + 1] = next22Spare;
+        }
+      }
+    }
 
     const costMap = new Map();
     const destroyMap = new Map();
 
-    for (let sim = 0; sim < simulationCount; sim++) {
+    for (let sim = 0; sim < simCount; sim++) {
       let star = startStar;
       let spentCost = 0;
-      let pureCost = 0;
-      let recoverCost = 0;
-      let consumedEquipCount = 0;
-      let trials = 0;
+      spareAcc = 0;
 
-      while (star < targetStar) {
-        trials++;
-        const probabilities = probTable[star];
-        const isDecided = probabilities[0] === 1.0;
-
-        const isProtected = safeguardRecord[`${star}`] && !isDecided;
-        const stepCost = discountedCosts[star] + (isProtected ? defaultCosts[star] * 2 : 0);
-
-        spentCost += stepCost;
-        pureCost += stepCost;
-
-        if (isDecided) {
-          star += 1;
-        } else {
-          const r = Math.random();
-          const pSuccess = probabilities[0];
-          const pMaintain = probabilities[1];
-
-          if (r < pSuccess) {
-            star += 1 + (isOnePlusOneEvent && star <= 10 ? 1 : 0);
-          } else if (r < pSuccess + pMaintain) {
-            // 유지
-          } else {
-            // 파괴
-            const isRestore = restoreRecord[star];
-
-            if (isRestore) {
-              // 직전 성수 복구
-              const restoreInfo = getRestoreTotalCost({
-                level,
-                star,
-                spareCost: baseCost,
-                event
-              });
-              if (restoreInfo) {
-                consumedEquipCount += restoreInfo.spareCount;
-                spentCost += restoreInfo.totalCost;
-                recoverCost += restoreInfo.totalCost;
-              } else {
-                consumedEquipCount += 1;
-                spentCost += baseCost;
-                recoverCost += baseCost;
-                star = 12;
-              }
-            } else {
-              // 12성 롤백 복구
-              consumedEquipCount += 1;
-              spentCost += baseCost;
-              recoverCost += baseCost;
-              star = 12;
-            }
-          }
+      // 12성 미만: 파괴 없음 (10성 이하 1+1 이벤트 반영)
+      while (star < Math.min(targetStar, 12)) {
+        spentCost += costs.discounted[star];
+        if (Math.random() < probTable[star][0]) {
+          star += 1 + (onePlusOneUnder10 && star <= 10 ? 1 : 0);
         }
       }
 
-      totalSpentCost += spentCost;
-      totalPureCost += pureCost;
-      totalRecoverCost += recoverCost;
-      totalConsumedEquips += consumedEquipCount;
-      totalTrials += trials;
+      // 12성 이상: 단계별 체류 비용 합
+      for (let s = Math.max(star, 12); s < targetStar; s++) {
+        spentCost += sojourn(s);
+      }
+
+      const consumedEquipCount = spareAcc;
 
       // 비용 히스토그램 Binning
       const binIdx = Math.floor(spentCost / binSize);
       costMap.set(binIdx, (costMap.get(binIdx) || 0) + 1);
 
-      // 파괴 횟수 히스토그램
+      // 소모 장비 히스토그램
       destroyMap.set(consumedEquipCount, (destroyMap.get(consumedEquipCount) || 0) + 1);
     }
 
@@ -171,7 +184,7 @@ export class MarkovEngine {
     }
     const costPMF = new Float64Array(maxBin + 1);
     for (let i = 0; i <= maxBin; i++) {
-      costPMF[i] = (costMap.get(i) || 0) / simulationCount;
+      costPMF[i] = (costMap.get(i) || 0) / simCount;
     }
 
     let maxDest = 0;
@@ -180,7 +193,7 @@ export class MarkovEngine {
     }
     const destroyPMF = new Float64Array(maxDest + 1);
     for (let i = 0; i <= maxDest; i++) {
-      destroyPMF[i] = (destroyMap.get(i) || 0) / simulationCount;
+      destroyPMF[i] = (destroyMap.get(i) || 0) / simCount;
     }
 
     // 수량(count) 배수 적용
@@ -188,11 +201,13 @@ export class MarkovEngine {
       item,
       name,
       count,
-      expCost: exactResult.expCost * count, // 수학적 정확 기댓값 적용
-      expPureCost: (totalPureCost / simulationCount) * count,
-      expRecoverCost: (totalRecoverCost / simulationCount) * count,
-      expDestroys: exactResult.expDestroys * count, // 수학적 정확 파괴수 적용
+      expCost: exactResult.expCost * count, // 수학적 정확 기댓값
+      expPureCost: exactResult.expPureCost * count,
+      expRecoverCost: exactResult.expRecoverCost * count,
+      expDestroys: exactResult.expDestroys * count, // 기대 소모 장비 개수 (확정복구 스페어 포함)
+      expDestroyCount: exactResult.expDestroyCount * count, // 기대 파괴 횟수
       expTrials: exactResult.expTrials * count,
+      simulationCount: simCount,
       costPMF,
       destroyPMF,
       binSize

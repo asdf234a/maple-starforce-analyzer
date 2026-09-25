@@ -295,6 +295,41 @@ body {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
+/* Smith Multiplier */
+.smith-multiplier-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.smith-input-wrap {
+  position: relative;
+}
+
+.smith-input-wrap .custom-input {
+  padding-right: 32px;
+}
+
+.smith-input-suffix {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.item-smith-cost {
+  font-weight: 700;
+  color: #e6a23c;
+}
+
+.item-smith-sub {
+  font-size: 11px;
+  color: #8b949e;
+}
+
 /* PC Room Row */
 .pc-room-row {
   display: flex;

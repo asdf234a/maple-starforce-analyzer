@@ -5,6 +5,10 @@
 
 import { MarkovEngine } from './markovEngine.js';
 import { FFTEngine } from './fftEngine.js';
+import { StarforceOptimizer } from './optimizer.js';
+import { DEFAULT_EVENT } from './starforceData.js';
+
+export const DEFAULT_SMITH_MULTIPLIER = 1.08;
 
 export class MultiAnalyzer {
   /**
@@ -22,9 +26,47 @@ export class MultiAnalyzer {
   }
 
   /**
+   * 비용 x 이하로 완성할 확률 (구간 내 선형 보간)
+   */
+  static getCdfAt(pmf, binSize, x) {
+    const pos = x / binSize;
+    const idx = Math.floor(pos);
+    if (idx < 0) return 0;
+    if (idx >= pmf.length) return 1;
+    let cum = 0;
+    for (let i = 0; i < idx; i++) cum += pmf[i];
+    cum += pmf[idx] * (pos - idx);
+    return Math.min(1, Math.max(0, cum));
+  }
+
+  /**
+   * 대장장이 배율 정규화 (잘못된 값이면 기본 1.08배)
+   */
+  static normalizeSmithMultiplier(value) {
+    const m = parseFloat(value);
+    return Number.isFinite(m) && m > 0 ? m : DEFAULT_SMITH_MULTIPLIER;
+  }
+
+  /**
+   * 대장장이 가격(기댓값 × 배율)과 직작 승률
+   * - winProb: 직접 강화 비용이 대장장이 가격 이하일 확률 (%)
+   */
+  static getSmithAnalysis(pmf, binSize, expCost, multiplier) {
+    const smithCost = expCost * multiplier;
+    const winProb = this.getCdfAt(pmf, binSize, smithCost) * 100;
+    return {
+      multiplier,
+      smithCost,
+      winProb,
+      loseProb: Math.max(0, 100 - winProb),
+      percentileRank: (100 - winProb).toFixed(2)
+    };
+  }
+
+  /**
    * 다중 아이템 종합 분석 수행
    * @param {Array} items - 아이템 목록 [{ id, name, level, startStar, targetStar, baseCost, count }]
-   * @param {Object} options - 전역 옵션 (event30, event1516, mvpDiscount, pcRoom, preventDestruction)
+   * @param {Object} options - 전역 옵션 (event, mvpDiscount, pcRoom, smithMultiplier)
    */
   static analyze(items, options = {}) {
     const startTime = performance.now();
@@ -33,18 +75,23 @@ export class MultiAnalyzer {
       return null;
     }
 
-    // 아이템들의 총 비용 규모에 따라 적절한 binSize 자동 산정 (기본 1천만 메소, 대규모는 5천만~1억 메소)
+    // 정확 기댓값 기준으로 binSize 자동 산정 (분포 배열이 약 2만 칸 내외가 되도록, 최소 1천만 메소)
+    const { event = DEFAULT_EVENT, mvpDiscount = 0, pcRoom = false } = options;
     let totalRoughCost = 0;
     items.forEach(it => {
-      const diff = Math.max(0, it.targetStar - it.startStar);
-      totalRoughCost += diff * 1500000000 * (it.count || 1);
+      if (it.startStar >= it.targetStar) return;
+      const exact = StarforceOptimizer.getExactMarkovExpectation(it, event, mvpDiscount, pcRoom);
+      totalRoughCost += exact.expCost * (it.count || 1);
     });
 
-    let binSize = 10000000; // 1,000만 메소
-    if (totalRoughCost > 500000000000) { // 5,000억 초과 시
-      binSize = 50000000; // 5,000만 메소
-    } else if (totalRoughCost > 200000000000) { // 2,000억 초과 시
-      binSize = 25000000; // 2,500만 메소
+    const MIN_BIN_SIZE = 10000000; // 1,000만 메소
+    const rawBin = totalRoughCost / 20000;
+    let binSize = MIN_BIN_SIZE;
+    if (rawBin > MIN_BIN_SIZE) {
+      // 1, 2, 5 × 10^n 단위로 올림
+      const exp = Math.pow(10, Math.floor(Math.log10(rawBin)));
+      const mant = rawBin / exp;
+      binSize = (mant <= 1 ? 1 : mant <= 2 ? 2 : mant <= 5 ? 5 : 10) * exp;
     }
 
     // 개별 아이템 분석
@@ -93,19 +140,15 @@ export class MultiAnalyzer {
       totalCostCDF[i] = Math.min(1.0, cdfAcc);
     }
 
-    // 대장장이 가격(기댓값의 1.08배) 구간 및 승률 분석
-    const smithCost = totalExpCost * 1.08;
-    const smithBinIdx = Math.min(totalCostCDF.length - 1, Math.max(0, Math.floor(smithCost / binSize)));
-    const smithWinProb = (totalCostCDF[smithBinIdx] || 0) * 100; // 직작이 대장장이보다 저렴할 확률
-    const smithLoseProb = Math.max(0, 100 - smithWinProb);       // 직작이 대장장이보다 비쌀 확률
+    // 대장장이 가격(기댓값 × 배율) 구간 및 승률 분석 (전체 + 장비별)
+    const smithMultiplier = this.normalizeSmithMultiplier(options.smithMultiplier);
+    const smithAnalysis = this.getSmithAnalysis(totalCostPMF, binSize, totalExpCost, smithMultiplier);
 
-    const smithAnalysis = {
-      multiplier: 1.08,
-      smithCost,
-      winProb: smithWinProb,       // 이득 확률 (%)
-      loseProb: smithLoseProb,     // 손해 확률 (%)
-      percentileRank: (100 - smithWinProb).toFixed(2) // 상위 몇 % 선인지
-    };
+    itemResults.forEach(r => {
+      const cnt = Math.max(1, parseInt(r.count) || 1);
+      const itemPMF = cnt === 1 ? r.costPMF : FFTEngine.convolveMultiple(new Array(cnt).fill(r.costPMF));
+      r.smithAnalysis = this.getSmithAnalysis(itemPMF, binSize, r.expCost, smithMultiplier);
+    });
 
     // 파괴 횟수 상세 통계 (0회 ~ 10회 이상)
     const destroyStats = [];

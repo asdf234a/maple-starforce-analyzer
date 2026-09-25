@@ -44,13 +44,14 @@ export const STARFORCE_CONFIG = {
     [0.105, 0.716, 0.179], // 23
     [0.105, 0.716, 0.179], // 24
     [0.105, 0.716, 0.179], // 25
-    [0.0735, 0.7416, 0.1853], // 26
+    [0.0735, 0.7412, 0.1853], // 26
     [0.0525, 0.758, 0.1895], // 27
     [0.0315, 0.7748, 0.1937], // 28
     [0.0105, 0.7916, 0.1979], // 29
   ],
 
-  // mesulive: restoreResourceTable [스페어 개수, 메소(억 단위)]
+  // restoreResourceTable [스페어 개수, 메소(억 단위)]
+  // 140/160/200/250제: 인게임 확인값 (starforce.gg/blog/ev-calculation-logic)
   restoreResourceTable: {
     130: {
       15: [1, 1.19], 16: [1, 2.87], 17: [1, 4.85], 18: [1, 11.03], 19: [2, 18.27], 20: [0, 0], 21: [0, 0], 22: [0, 0]
@@ -59,7 +60,7 @@ export const STARFORCE_CONFIG = {
       15: [1, 1.33], 16: [1, 3.21], 17: [1, 5.42], 18: [1, 12.31], 19: [2, 20.43], 20: [0, 0], 21: [0, 0], 22: [0, 0]
     },
     140: {
-      15: [1, 1.48], 16: [1, 3.58], 17: [1, 6.05], 18: [1, 13.74], 19: [2, 22.79], 20: [2, 40.15], 21: [3, 50.45], 22: [4, 82.9]
+      15: [1, 1.49], 16: [1, 3.59], 17: [1, 6.06], 18: [1, 13.8], 19: [2, 22.8], 20: [2, 40.2], 21: [3, 50.5], 22: [4, 82.9]
     },
     145: {
       15: [1, 1.65], 16: [1, 3.98], 17: [1, 6.71], 18: [1, 15.28], 19: [2, 25.4], 20: [2, 44.5], 21: [3, 56.05], 22: [4, 92.25]
@@ -68,13 +69,13 @@ export const STARFORCE_CONFIG = {
       15: [1, 1.83], 16: [1, 4.41], 17: [1, 7.45], 18: [1, 16.89], 19: [2, 28.03], 20: [2, 49.44], 21: [3, 62.24], 22: [4, 101.79]
     },
     160: {
-      15: [1, 2.22], 16: [1, 5.35], 17: [1, 9.03], 18: [1, 20.5], 19: [2, 34.02], 20: [2, 59.93], 21: [3, 75.31], 22: [4, 123.74]
+      15: [1, 2.22], 16: [1, 5.35], 17: [1, 9.04], 18: [1, 20.6], 19: [2, 34.1], 20: [2, 60], 21: [3, 75.4], 22: [4, 124]
     },
     200: {
-      15: [1, 4.33], 16: [1, 10.44], 17: [1, 17.64], 18: [1, 40.05], 19: [2, 66.44], 20: [2, 117.06], 21: [3, 147.09], 22: [4, 241.68]
+      15: [1, 4.33], 16: [1, 10.5], 17: [1, 17.7], 18: [1, 40.1], 19: [2, 66.5], 20: [2, 118], 21: [3, 148], 22: [4, 242]
     },
     250: {
-      15: [1, 8.46], 16: [1, 20.39], 17: [1, 34.46], 18: [1, 78.21], 19: [2, 129.77], 20: [2, 228.63], 21: [3, 287.28], 22: [4, 472.04]
+      15: [1, 8.46], 16: [1, 20.4], 17: [1, 34.5], 18: [1, 78.3], 19: [2, 130], 20: [2, 229], 21: [3, 288], 22: [4, 473]
     }
   }
 };
@@ -105,50 +106,91 @@ export function getCosts(equipLevel) {
   });
 }
 
+export const DEFAULT_EVENT = '샤이닝 스타포스 (비용 30% 할인 + 21성 이하 파괴 확률 30% 감소 + 흔적 복구 메소 20% 할인)';
+
 /**
- * mesulive: getProbTable(safeguardRecord, event)
+ * 이벤트 문자열 → 이벤트 효과 플래그
+ * - 샤이닝 스타포스(샤타) = 비용 30% 할인 + 21성 이하 파괴 30% 감소 + 흔적 복구 메소 20% 할인
+ */
+export function parseEvent(event = null) {
+  const e = event || '';
+  const isShining = e.includes('샤이닝') || e.includes('샤타');
+  return {
+    costDiscount: isShining || e.includes('30% 할인') || e.includes('비용 할인') || e.includes('메소 할인'),
+    destroyReduction: isShining || e.includes('파괴'),
+    restoreDiscount: isShining || e.includes('흔적 복구'),
+    onePlusOneUnder10: e.includes('10성 이하 1+1'),
+    onePlusOne15: e.includes('1+1') && e.includes('15')
+  };
+}
+
+/**
+ * 성수별 1회 시도 비용
+ * - discounted: MVP·PC방(17성 미만) 및 30% 할인 이벤트가 곱셈으로 적용된 비용
+ * - protected: 파괴방지 ON 비용 (할인 비용 + 할인 전 비용 × 2)
+ */
+export function getAttemptCosts(level, event = null, mvpDiscount = 0, pcRoom = false) {
+  const raw = getCosts(level);
+  const { costDiscount } = parseEvent(event);
+
+  const discounted = raw.map((cost, star) => {
+    let m = star < 17 ? 1 - mvpDiscount - (pcRoom ? 0.05 : 0) : 1;
+    if (costDiscount) m *= 0.7;
+    return Math.round(cost * m);
+  });
+
+  return {
+    raw,
+    discounted,
+    protected: discounted.map((cost, star) => cost + raw[star] * 2)
+  };
+}
+
+/**
+ * 성수별 [success, fail(유지), destroy] 확률표
+ * @param {Object} safeguardRecord - { [star]: true } 파괴방지 적용 성수 (15~17성만 유효)
  */
 export function getProbTable(safeguardRecord = {}, event = null) {
-  const table = JSON.parse(JSON.stringify(STARFORCE_CONFIG.probTable));
+  const { destroyReduction, onePlusOne15 } = parseEvent(event);
 
-  // 파괴확률 30% 감소 이벤트
-  const isDestroyReduction = event !== null && (event.includes('파괴') || event.includes('샤이닝'));
+  return STARFORCE_CONFIG.probTable.map((row, star) => {
+    let [success, fail, destroy] = row;
 
-  if (isDestroyReduction) {
-    for (let i = 0; i < 22; i++) {
-      const destroyProb = table[i][2];
-      table[i][2] = destroyProb * 0.7;
-      table[i][1] += destroyProb * 0.3;
+    // 파괴확률 30% 감소 이벤트 (21성 이하)
+    if (destroyReduction && star <= 21) {
+      fail += destroy * 0.3;
+      destroy *= 0.7;
     }
-  }
 
-  // 파괴 방지 적용
-  return table.map((row, index) => {
-    const result = [...row];
-    if (safeguardRecord[index]) {
-      result[1] += result[2];
-      result[2] = 0;
+    // 15·16성 1+1 이벤트: 15 → 16 성공 보장
+    if (onePlusOne15 && star === 15) return [1, 0, 0];
+
+    // 파괴 방지 (15~17성)
+    if (safeguardRecord[star] && star >= 15 && star <= 17) {
+      fail += destroy;
+      destroy = 0;
     }
-    return result;
+
+    return [success, fail, destroy];
   });
 }
 
 const HUNDRED_MILLION = 100000000;
 
 /**
- * mesulive: getRestoreTotalCost({ level, star, spareCost, event })
+ * 확정복구 1회 총비용 (스페어 장비 + 흔적 복구 메소)
+ * - 15~22성: 해당 성수로 복구, 23성 이상: 22성으로 복구
  */
 export function getRestoreTotalCost({ level, star, spareCost, event = null }) {
   const resByLevel = STARFORCE_CONFIG.restoreResourceTable[level];
-  if (!resByLevel || !resByLevel[star]) return null;
+  const restoreStar = Math.min(star, 22); // 22성 이상 파괴 시 22성으로 복구
+  if (!resByLevel || !resByLevel[restoreStar]) return null;
 
-  const [requiredSpareCount, restoreCostInHundredMillions] = resByLevel[star];
+  const [requiredSpareCount, restoreCostInHundredMillions] = resByLevel[restoreStar];
   if (requiredSpareCount <= 0 || restoreCostInHundredMillions <= 0) return null;
 
   const restoreCostMeso = Math.round(restoreCostInHundredMillions * HUNDRED_MILLION);
-  const hasRestoreDiscount = event !== null && (event.includes('흔적 복구') || event.includes('샤이닝'));
-
-  const discountRatio = hasRestoreDiscount ? 0.2 : 0;
+  const discountRatio = parseEvent(event).restoreDiscount ? 0.2 : 0;
   const discountedRestoreCostMeso = Math.round(restoreCostMeso * (1 - discountRatio));
 
   return {

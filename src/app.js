@@ -4,7 +4,7 @@
  */
 
 import { STARFORCE_CONFIG } from './starforceData.js';
-import { MultiAnalyzer } from './multiAnalyzer.js';
+import { MultiAnalyzer, DEFAULT_SMITH_MULTIPLIER } from './multiAnalyzer.js';
 import { StarforceOptimizer } from './optimizer.js';
 
 // 애플리케이션 상태 (기본 목록: 빈 목록으로 시작)
@@ -16,7 +16,8 @@ const state = {
     safeguard: { 15: true, 16: true, 17: true },
     restoreMode: 'optimal', // 'optimal' (성수별 최대 효율 복구)
     mvpDiscount: 0,
-    pcRoom: false
+    pcRoom: false,
+    smithMultiplier: DEFAULT_SMITH_MULTIPLIER
   },
   costChart: null,
   destroyChart: null
@@ -24,6 +25,32 @@ const state = {
 
 // 로컬 스토리지 키
 const STORAGE_KEY_PRESETS = 'maple_sf_custom_presets_v2';
+const STORAGE_KEY_SMITH = 'maple_sf_smith_multiplier';
+
+/**
+ * 대장장이 배율 표기 (예: 1.08배)
+ */
+function formatSmithMultiplier(m) {
+  return `${Number(m).toFixed(2)}배`;
+}
+
+function loadSmithMultiplier() {
+  try {
+    const saved = parseFloat(localStorage.getItem(STORAGE_KEY_SMITH));
+    if (Number.isFinite(saved) && saved > 0) return saved;
+  } catch (e) {
+    // 스토리지 접근 불가 시 기본값 사용
+  }
+  return DEFAULT_SMITH_MULTIPLIER;
+}
+
+function saveSmithMultiplier(m) {
+  try {
+    localStorage.setItem(STORAGE_KEY_SMITH, String(m));
+  } catch (e) {
+    // 저장 실패는 무시 (기능에는 영향 없음)
+  }
+}
 
 /**
  * 메소 단위를 '~억 ~만 메소'로 포맷팅
@@ -75,7 +102,8 @@ function getCalculatedOptions() {
     safeguardRecord: { 15: true, 16: true, 17: true },
     restoreRecord: { 15: true, 16: true, 17: true, 18: true, 19: true, 20: true, 21: true, 22: true },
     mvpDiscount: mvp,
-    pcRoom: pc
+    pcRoom: pc,
+    smithMultiplier: state.options.smithMultiplier
   };
 }
 
@@ -123,9 +151,10 @@ function renderKpis(result) {
   document.getElementById('kpiBottom10Cost').innerText = formatMeso(result.percentiles.p90);
   document.getElementById('kpiTotalDestroys').innerText = `${result.totalExpDestroys.toFixed(2)} 개`;
 
-  // 대장장이 가격 (기댓값 × 1.08) 및 승률
+  // 대장장이 가격 (기댓값 × 배율) 및 승률
   if (result.smithAnalysis) {
     const s = result.smithAnalysis;
+    document.getElementById('kpiSmithLabel').innerText = `대장장이 가격 (기댓값 ${formatSmithMultiplier(s.multiplier)})`;
     document.getElementById('kpiSmithCost').innerText = formatMeso(s.smithCost);
     document.getElementById('kpiSmithDesc').innerText = `직작 승률: ${s.winProb.toFixed(1)}% (상위 ${s.percentileRank}% 선)`;
   }
@@ -432,7 +461,7 @@ function renderTables(result) {
   const percTbody = document.querySelector('#percentileTable tbody');
 
   if (!result || !result.items || result.items.length === 0) {
-    itemTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#8b949e;">장비 목록이 비어 있습니다.</td></tr>';
+    itemTbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#8b949e;">장비 목록이 비어 있습니다.</td></tr>';
     percTbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#8b949e;">데이터가 없습니다.</td></tr>';
     return;
   }
@@ -455,7 +484,7 @@ function renderTables(result) {
       return `<span class="strategy-badge ${isSafe ? 'safe-on' : 'safe-off'}">${s}성 ${isSafe ? '🛡️파방' : '파방X'}</span>`;
     }).join('');
 
-    // 15~22성 복구 전략 텍스트
+    // 15성 이상 확정복구 전략 텍스트 (23성 이상은 22성으로 복구)
     const restoreBadges = (optimal.restore.length > 0)
       ? `<span class="strategy-badge restore-on">✨확정복구 (${optimal.restore.join(',')}성)</span>`
       : `<span class="strategy-badge restore-off">🔄12성 롤백</span>`;
@@ -477,8 +506,14 @@ function renderTables(result) {
           <div style="font-weight:700; color:var(--accent-gold);">${formatMeso(r.expCost)}</div>
         </td>
         <td>
+          ${r.expCost > 0 && r.smithAnalysis ? `
+            <div class="item-smith-cost">${formatMeso(r.smithAnalysis.smithCost)}</div>
+            <div class="item-smith-sub">직작 승률 ${r.smithAnalysis.winProb.toFixed(1)}%</div>
+          ` : '<span class="item-smith-sub">-</span>'}
+        </td>
+        <td>
           <span style="color:#ff7b72; font-weight:700;">${r.expDestroys.toFixed(3)}개</span>
-          <div style="font-size:11px; color:#8b949e;">평균 ${r.expTrials ? r.expTrials.toFixed(1) : '0'}회 시도</div>
+          <div style="font-size:11px; color:#8b949e;">파괴 ${(r.expDestroyCount || 0).toFixed(3)}회 · 평균 ${r.expTrials ? r.expTrials.toFixed(1) : '0'}회 시도</div>
         </td>
       </tr>
     `;
@@ -495,7 +530,7 @@ function renderTables(result) {
     { label: '상위 25%', meaning: '상위 25% 이내 완성', val: p.p25, tag: '' },
     { label: '중앙값 (50%)', meaning: '유저 기준 중간선 (절반이 이 비용 이하)', val: p.p50, tag: 'tag-p50' },
     { label: '기대값 (평균 1.00배)', meaning: '수학적 기댓값 평균 비용', val: result.totalExpCost, tag: '' },
-    { label: '🔨 대장장이 가격 (1.08배)', meaning: `직작 승률 ${s.winProb.toFixed(1)}% (이 가격 이하로 완성할 확률)`, val: s.smithCost, tag: 'tag-smith' },
+    { label: `🔨 대장장이 가격 (${formatSmithMultiplier(s.multiplier)})`, meaning: `직작 승률 ${s.winProb.toFixed(1)}% (이 가격 이하로 완성할 확률)`, val: s.smithCost, tag: 'tag-smith' },
     { label: '상위 75%', meaning: '상위 75% 선 (하위 25%)', val: p.p75, tag: '' },
     { label: '상위 90% (안전선)', meaning: '90% 확률로 이 예산 내 완성 (추천 예산)', val: p.p90, tag: 'tag-p90' },
     { label: '상위 95%', meaning: '95% 확률로 이 예산 내 완성', val: p.p95, tag: 'tag-p90' },
@@ -690,6 +725,36 @@ function initEvents() {
     });
   }
 
+  // 3-1. 대장장이 배율 (빠른 선택 버튼 + 직접 입력)
+  const inputSmith = document.getElementById('inputSmithMultiplier');
+  const smithButtons = document.querySelectorAll('#smithButtonGroup .pill-btn');
+  const syncSmithUI = () => {
+    const m = state.options.smithMultiplier;
+    if (inputSmith && parseFloat(inputSmith.value) !== m) inputSmith.value = m;
+    smithButtons.forEach(b => b.classList.toggle('active', Math.abs(parseFloat(b.dataset.value) - m) < 1e-9));
+    const th = document.getElementById('thItemSmith');
+    if (th) th.innerText = `대장장이 (${formatSmithMultiplier(m)})`;
+  };
+  const setSmithMultiplier = (value) => {
+    const m = parseFloat(value);
+    if (!Number.isFinite(m) || m < 0.5 || m > 5) return false;
+    state.options.smithMultiplier = Math.round(m * 10000) / 10000;
+    saveSmithMultiplier(state.options.smithMultiplier);
+    syncSmithUI();
+    runAnalysis();
+    return true;
+  };
+  smithButtons.forEach(btn => {
+    btn.addEventListener('click', () => setSmithMultiplier(btn.dataset.value));
+  });
+  if (inputSmith) {
+    inputSmith.addEventListener('change', () => {
+      if (!setSmithMultiplier(inputSmith.value)) syncSmithUI();
+    });
+  }
+  state.options.smithMultiplier = loadSmithMultiplier();
+  syncSmithUI();
+
   // 4. 커스텀 프리셋 저장 버튼
   document.getElementById('btnSaveCustomPreset').addEventListener('click', () => {
     if (state.items.length === 0) {
@@ -834,7 +899,10 @@ function initEvents() {
         const optimal = StarforceOptimizer.getOptimalReinforcement(r.item, calculatedOptions.event, calculatedOptions.mvpDiscount, calculatedOptions.pcRoom);
         const safeStr = optimal.destroyPrevention.length > 0 ? `[${optimal.destroyPrevention.join(',')}성 파방]` : `[파방 미사용]`;
         const restStr = optimal.restore.length > 0 ? `[${optimal.restore.join(',')}성 확정복구]` : `[12성 롤백]`;
-        report += `• ${r.name} (${r.item.level}제 | ${r.item.startStar}→${r.item.targetStar}성 | ${r.count}개): ${formatMeso(r.expCost)} | 파괴: ${r.expDestroys.toFixed(3)}개 | ${safeStr} ${restStr}\n`;
+        const smithStr = r.smithAnalysis && r.expCost > 0
+          ? ` | 대장장이 ${formatMeso(r.smithAnalysis.smithCost)} (직작 승률 ${r.smithAnalysis.winProb.toFixed(1)}%)`
+          : '';
+        report += `• ${r.name} (${r.item.level}제 | ${r.item.startStar}→${r.item.targetStar}성 | ${r.count}개): ${formatMeso(r.expCost)}${smithStr} | 파괴: ${r.expDestroys.toFixed(3)}개 | ${safeStr} ${restStr}\n`;
       });
 
       report += `\n📈 [비용 백분위수 컷라인 & 대장장이 비교]\n`;
@@ -846,7 +914,7 @@ function initEvents() {
       report += `• 기댓값 (평균 1.00배): ${formatMeso(result.totalExpCost)}\n`;
       if (result.smithAnalysis) {
         const sm = result.smithAnalysis;
-        report += `• 🔨 대장장이 가격 (1.08배): ${formatMeso(sm.smithCost)} (직작 승률 ${sm.winProb.toFixed(1)}% | 상위 ${sm.percentileRank}%선)\n`;
+        report += `• 🔨 대장장이 가격 (${formatSmithMultiplier(sm.multiplier)}): ${formatMeso(sm.smithCost)} (직작 승률 ${sm.winProb.toFixed(1)}% | 상위 ${sm.percentileRank}%선)\n`;
       }
       report += `• 상위 75%: ${formatMeso(result.percentiles.p75)}\n`;
       report += `• 상위 90% (추천 예산): ${formatMeso(result.percentiles.p90)}\n`;
@@ -874,12 +942,12 @@ function initEvents() {
       }
 
       let csv = '\uFEFF'; // UTF-8 BOM for Excel
-      csv += '구분,장비명,레벨,시작성수,목표성수,수량,노작비용(메소),기대비용(메소),평균파괴수,최적파방,최적복구\n';
+      csv += `구분,장비명,레벨,시작성수,목표성수,수량,노작비용(메소),기대비용(메소),대장장이가격(${formatSmithMultiplier(result.smithAnalysis.multiplier)}),직작승률(%),평균파괴수,최적파방,최적복구\n`;
       result.items.forEach(r => {
         const optimal = StarforceOptimizer.getOptimalReinforcement(r.item, calculatedOptions.event, calculatedOptions.mvpDiscount, calculatedOptions.pcRoom);
         const safeStr = optimal.destroyPrevention.join(' ') || '미사용';
         const restStr = optimal.restore.join(' ') || '12성롤백';
-        csv += `장비,${r.name},${r.item.level},${r.item.startStar},${r.item.targetStar},${r.count},${r.item.baseCost},${Math.round(r.expCost)},${r.expDestroys.toFixed(3)},${safeStr},${restStr}\n`;
+        csv += `장비,${r.name},${r.item.level},${r.item.startStar},${r.item.targetStar},${r.count},${r.item.baseCost},${Math.round(r.expCost)},${Math.round(r.smithAnalysis.smithCost)},${r.smithAnalysis.winProb.toFixed(1)},${r.expDestroys.toFixed(3)},${safeStr},${restStr}\n`;
       });
 
       csv += '\n백분위,비용(메소),설명\n';
@@ -892,7 +960,7 @@ function initEvents() {
         ['상위 25%', p.p25, '상위 25%'],
         ['중앙값(50%)', p.p50, '유저 중간 기준선'],
         ['기댓값(평균)', result.totalExpCost, '수학적 기댓값 (1.00배)'],
-        ['대장장이 가격(1.08배)', s.smithCost, `직작 승률 ${s.winProb.toFixed(1)}% (상위 ${s.percentileRank}%선)`],
+        [`대장장이 가격(${formatSmithMultiplier(s.multiplier)})`, s.smithCost, `직작 승률 ${s.winProb.toFixed(1)}% (상위 ${s.percentileRank}%선)`],
         ['상위 75%', p.p75, '하위 25%'],
         ['상위 90%', p.p90, '90% 안전선'],
         ['상위 95%', p.p95, '심각한 억까'],
@@ -934,7 +1002,8 @@ function initEvents() {
           targetStar: r.item.targetStar,
           baseCost: r.item.baseCost,
           expCost: r.expCost,
-          expDestroys: r.expDestroys
+          expDestroys: r.expDestroys,
+          smithAnalysis: r.smithAnalysis
         }))
       };
 
