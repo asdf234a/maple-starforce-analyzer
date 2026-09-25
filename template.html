@@ -83,7 +83,24 @@
               </div>
             </div>
 
-            <!-- 4. 자동 최적화 안내 -->
+            <!-- 4. 대장장이 배율 -->
+            <div class="option-item">
+              <label class="option-label" for="inputSmithMultiplier">대장장이 배율 (기댓값 × 배율)</label>
+              <div class="smith-multiplier-row">
+                <div class="pill-button-group" id="smithButtonGroup">
+                  <button type="button" class="pill-btn" data-value="1.05">1.05배</button>
+                  <button type="button" class="pill-btn active" data-value="1.08">1.08배</button>
+                  <button type="button" class="pill-btn" data-value="1.1">1.10배</button>
+                  <button type="button" class="pill-btn" data-value="1.15">1.15배</button>
+                </div>
+                <div class="smith-input-wrap">
+                  <input type="number" id="inputSmithMultiplier" class="custom-input" min="0.5" max="5" step="0.01" value="1.08" inputmode="decimal">
+                  <span class="smith-input-suffix">배</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 5. 자동 최적화 안내 -->
             <div class="option-item">
               <div class="optimization-status-banner">
                 <i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent-gold); margin-top:2px;"></i>
@@ -176,11 +193,11 @@
             </div>
           </div>
 
-          <!-- 3. 대장장이 가격 (1.08배) -->
+          <!-- 3. 대장장이 가격 (기댓값 × 배율) -->
           <div class="kpi-card smith-card">
             <div class="kpi-icon smith-icon"><i class="fa-solid fa-hammer"></i></div>
             <div class="kpi-content">
-              <div class="kpi-label">대장장이 가격 (기댓값 1.08배)</div>
+              <div class="kpi-label" id="kpiSmithLabel">대장장이 가격 (기댓값 1.08배)</div>
               <div class="kpi-value" id="kpiSmithCost">-</div>
               <div class="kpi-sub" id="kpiSmithDesc">직작 승률: -%</div>
             </div>
@@ -257,6 +274,7 @@
                     <th>수량</th>
                     <th>노작 가격</th>
                     <th>기대 비용</th>
+                    <th id="thItemSmith">대장장이 (1.08배)</th>
                     <th>평균 파괴</th>
                   </tr>
                 </thead>

@@ -9,7 +9,7 @@ import assert from 'assert/strict';
 import { STARFORCE_CONFIG, DEFAULT_EVENT, getProbTable } from './src/starforceData.js';
 import { StarforceOptimizer } from './src/optimizer.js';
 import { MarkovEngine } from './src/markovEngine.js';
-import { MultiAnalyzer } from './src/multiAnalyzer.js';
+import { MultiAnalyzer, DEFAULT_SMITH_MULTIPLIER } from './src/multiAnalyzer.js';
 
 const EVENTS = {
   none: null,
@@ -168,6 +168,53 @@ test('칠흑 5부위 22성 결합 분석', () => {
 test('다중 분석: 30성 목표도 메모리 폭주 없이 완료', () => {
   const res = MultiAnalyzer.analyze([{ name: '에테르넬', level: 250, startStar: 22, targetStar: 30, baseCost: 15e8, count: 1 }], { event: DEFAULT_EVENT });
   assert.ok(Number.isFinite(res.totalExpCost));
+});
+
+// 8. 대장장이 배율 (전체 + 장비별)
+test('대장장이 배율: 기본 1.08배, 커스텀 배율 반영, 장비별 가격·승률 산출', () => {
+  const items = [
+    { name: 'A', level: 200, startStar: 12, targetStar: 22, baseCost: 30e8, count: 1 },
+    { name: 'B', level: 160, startStar: 15, targetStar: 21, baseCost: 25e8, count: 2 },
+    { name: 'C', level: 200, startStar: 22, targetStar: 22, baseCost: 30e8, count: 1 }
+  ];
+
+  const def = MultiAnalyzer.analyze(items, { event: DEFAULT_EVENT });
+  assert.equal(def.smithAnalysis.multiplier, DEFAULT_SMITH_MULTIPLIER);
+  assertClose(def.smithAnalysis.smithCost, def.totalExpCost * 1.08, 1e-12, '기본 전체 대장장이 가격');
+
+  let prevWin = 0;
+  for (const m of [1.0, 1.05, 1.2, 1.5]) {
+    const res = MultiAnalyzer.analyze(items, { event: DEFAULT_EVENT, smithMultiplier: m });
+    assert.equal(res.smithAnalysis.multiplier, m);
+    assertClose(res.smithAnalysis.smithCost, res.totalExpCost * m, 1e-12, `전체 ${m}배`);
+    assert.ok(res.smithAnalysis.winProb >= prevWin - 1, `배율이 커질수록 직작 승률 증가 (${m}배)`);
+    prevWin = res.smithAnalysis.winProb;
+
+    for (const r of res.items) {
+      assert.ok(r.smithAnalysis, `${r.name} 장비별 대장장이 분석`);
+      assertClose(r.smithAnalysis.smithCost, r.expCost * m, 1e-12, `${r.name} ${m}배`);
+      assert.ok(r.smithAnalysis.winProb >= 0 && r.smithAnalysis.winProb <= 100, `${r.name} 승률 범위`);
+    }
+  }
+
+  // 잘못된 배율은 기본값으로
+  const bad = MultiAnalyzer.analyze(items, { event: DEFAULT_EVENT, smithMultiplier: 'abc' });
+  assert.equal(bad.smithAnalysis.multiplier, DEFAULT_SMITH_MULTIPLIER);
+});
+
+test('장비별 직작 승률 ≈ 시뮬레이션 경험적 확률', () => {
+  const item = { level: 200, startStar: 12, targetStar: 22, baseCost: 30e8, count: 1 };
+  const m = 1.08;
+  const res = MultiAnalyzer.analyze([item], { event: DEFAULT_EVENT, smithMultiplier: m });
+  const smithCost = res.items[0].smithAnalysis.smithCost;
+  // 독립 시뮬레이션의 CDF로 검증 (구간 1백만 메소)
+  const sim = MarkovEngine.simulateItem(item, { event: DEFAULT_EVENT }, 40000, 1e6);
+  const empirical = MultiAnalyzer.getCdfAt(sim.costPMF, 1e6, smithCost) * 100;
+  const got = res.items[0].smithAnalysis.winProb;
+  assert.ok(Math.abs(got - empirical) < 1.5, `장비별 승률 ${got.toFixed(2)}% vs 경험적 ${empirical.toFixed(2)}%`);
+  // 단일 장비면 전체 승률과 장비별 승률이 같음
+  assertClose(res.smithAnalysis.winProb, got, 1e-9, '단일 장비 전체=장비별');
+  console.log(`  200제 12→22 샤타 노작 30억: 대장장이 ${eok(smithCost)} / 직작 승률 ${got.toFixed(1)}%`);
 });
 
 if (failures > 0) {

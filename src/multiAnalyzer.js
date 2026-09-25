@@ -8,6 +8,8 @@ import { FFTEngine } from './fftEngine.js';
 import { StarforceOptimizer } from './optimizer.js';
 import { DEFAULT_EVENT } from './starforceData.js';
 
+export const DEFAULT_SMITH_MULTIPLIER = 1.08;
+
 export class MultiAnalyzer {
   /**
    * 백분위수(Percentile) 산출 (0.0 ~ 1.0)
@@ -24,9 +26,47 @@ export class MultiAnalyzer {
   }
 
   /**
+   * 비용 x 이하로 완성할 확률 (구간 내 선형 보간)
+   */
+  static getCdfAt(pmf, binSize, x) {
+    const pos = x / binSize;
+    const idx = Math.floor(pos);
+    if (idx < 0) return 0;
+    if (idx >= pmf.length) return 1;
+    let cum = 0;
+    for (let i = 0; i < idx; i++) cum += pmf[i];
+    cum += pmf[idx] * (pos - idx);
+    return Math.min(1, Math.max(0, cum));
+  }
+
+  /**
+   * 대장장이 배율 정규화 (잘못된 값이면 기본 1.08배)
+   */
+  static normalizeSmithMultiplier(value) {
+    const m = parseFloat(value);
+    return Number.isFinite(m) && m > 0 ? m : DEFAULT_SMITH_MULTIPLIER;
+  }
+
+  /**
+   * 대장장이 가격(기댓값 × 배율)과 직작 승률
+   * - winProb: 직접 강화 비용이 대장장이 가격 이하일 확률 (%)
+   */
+  static getSmithAnalysis(pmf, binSize, expCost, multiplier) {
+    const smithCost = expCost * multiplier;
+    const winProb = this.getCdfAt(pmf, binSize, smithCost) * 100;
+    return {
+      multiplier,
+      smithCost,
+      winProb,
+      loseProb: Math.max(0, 100 - winProb),
+      percentileRank: (100 - winProb).toFixed(2)
+    };
+  }
+
+  /**
    * 다중 아이템 종합 분석 수행
    * @param {Array} items - 아이템 목록 [{ id, name, level, startStar, targetStar, baseCost, count }]
-   * @param {Object} options - 전역 옵션 (event30, event1516, mvpDiscount, pcRoom, preventDestruction)
+   * @param {Object} options - 전역 옵션 (event, mvpDiscount, pcRoom, smithMultiplier)
    */
   static analyze(items, options = {}) {
     const startTime = performance.now();
@@ -100,19 +140,15 @@ export class MultiAnalyzer {
       totalCostCDF[i] = Math.min(1.0, cdfAcc);
     }
 
-    // 대장장이 가격(기댓값의 1.08배) 구간 및 승률 분석
-    const smithCost = totalExpCost * 1.08;
-    const smithBinIdx = Math.min(totalCostCDF.length - 1, Math.max(0, Math.floor(smithCost / binSize)));
-    const smithWinProb = (totalCostCDF[smithBinIdx] || 0) * 100; // 직작이 대장장이보다 저렴할 확률
-    const smithLoseProb = Math.max(0, 100 - smithWinProb);       // 직작이 대장장이보다 비쌀 확률
+    // 대장장이 가격(기댓값 × 배율) 구간 및 승률 분석 (전체 + 장비별)
+    const smithMultiplier = this.normalizeSmithMultiplier(options.smithMultiplier);
+    const smithAnalysis = this.getSmithAnalysis(totalCostPMF, binSize, totalExpCost, smithMultiplier);
 
-    const smithAnalysis = {
-      multiplier: 1.08,
-      smithCost,
-      winProb: smithWinProb,       // 이득 확률 (%)
-      loseProb: smithLoseProb,     // 손해 확률 (%)
-      percentileRank: (100 - smithWinProb).toFixed(2) // 상위 몇 % 선인지
-    };
+    itemResults.forEach(r => {
+      const cnt = Math.max(1, parseInt(r.count) || 1);
+      const itemPMF = cnt === 1 ? r.costPMF : FFTEngine.convolveMultiple(new Array(cnt).fill(r.costPMF));
+      r.smithAnalysis = this.getSmithAnalysis(itemPMF, binSize, r.expCost, smithMultiplier);
+    });
 
     // 파괴 횟수 상세 통계 (0회 ~ 10회 이상)
     const destroyStats = [];
