@@ -64,9 +64,87 @@ export class MarkovEngine {
       restoreInfos[s] = getRestoreTotalCost({ level, star: s, spareCost: baseCost, event });
     });
 
-    // 기대 시도 횟수가 매우 큰 구간(26성 이상 등)은 시뮬레이션 총 시도 수를 제한해 UI 멈춤 방지
-    const MAX_TOTAL_TRIALS = 2e7;
-    const simCount = Math.max(1, Math.min(simulationCount, Math.floor(MAX_TOTAL_TRIALS / Math.max(1, exactResult.expTrials))));
+    // 계층적 샘플링
+    // 파괴 후 12성(또는 23성 이상 확정복구 시 22성)부터 다시 올라오는 비용을 매번 새로 시뮬레이션하면
+    // 연산량이 기대 시도 횟수에 비례해 30성 목표에서는 수천만 번이 됩니다.
+    // 대신 "12성 → s성" / "22성 → s성" 비용 표본 풀을 아래 단계부터 쌓아 두고, 파괴 시 풀에서 무작위로 뽑아 더합니다.
+    // (X_{12→s+1} = X_{12→s} + 체류 비용(s), 체류 중 파괴 시 노작값 + 독립 표본 X_{12→s})
+    // 연산량은 표본 수 × Σ(1/성공확률) 수준으로 목표 성수와 무관하게 일정합니다.
+    const simCount = Math.max(1, simulationCount);
+    const randomIndex = () => Math.floor(Math.random() * simCount);
+
+    const pool12Cost = [];
+    const pool12Spare = [];
+    const pool22Cost = [];
+    const pool22Spare = [];
+
+    let spareAcc = 0;
+
+    // s성 → s+1성 성공까지의 비용 표본 (소모 장비는 spareAcc에 누적)
+    const sojourn = (s) => {
+      const [pSuccess, pMaintain] = probTable[s];
+      const attemptCost = safeguardRecord[s] ? costs.protected[s] : costs.discounted[s];
+      const restoreInfo = strategies[s] === 'restore' ? restoreInfos[s] : null;
+      let cost = 0;
+
+      for (;;) {
+        cost += attemptCost;
+        const r = Math.random();
+        if (r < pSuccess) return cost;
+        if (r < pSuccess + pMaintain) continue; // 유지
+
+        if (restoreInfo) {
+          // 확정복구: 15~22성은 해당 성수, 23성 이상은 22성으로 복구 후 재상승
+          cost += restoreInfo.totalCost;
+          spareAcc += restoreInfo.spareCount;
+          if (s > 22) {
+            const j = randomIndex();
+            cost += pool22Cost[s][j];
+            spareAcc += pool22Spare[s][j];
+          }
+        } else {
+          // 12성 롤백: 노작값 + 12성 → s성 재상승
+          const j = randomIndex();
+          cost += baseCost + pool12Cost[s][j];
+          spareAcc += 1 + pool12Spare[s][j];
+        }
+      }
+    };
+
+    // 표본 풀 구축 (12성 → s성, 22성 → s성)
+    if (targetStar > 12) {
+      pool12Cost[12] = new Float64Array(simCount);
+      pool12Spare[12] = new Float64Array(simCount);
+
+      for (let s = 12; s < targetStar - 1; s++) {
+        if (s === 22) {
+          pool22Cost[22] = new Float64Array(simCount);
+          pool22Spare[22] = new Float64Array(simCount);
+        }
+
+        const nextCost = new Float64Array(simCount);
+        const nextSpare = new Float64Array(simCount);
+        for (let i = 0; i < simCount; i++) {
+          spareAcc = 0;
+          nextCost[i] = pool12Cost[s][i] + sojourn(s);
+          nextSpare[i] = pool12Spare[s][i] + spareAcc;
+        }
+        pool12Cost[s + 1] = nextCost;
+        pool12Spare[s + 1] = nextSpare;
+
+        if (s >= 22) {
+          const next22Cost = new Float64Array(simCount);
+          const next22Spare = new Float64Array(simCount);
+          for (let i = 0; i < simCount; i++) {
+            spareAcc = 0;
+            next22Cost[i] = pool22Cost[s][i] + sojourn(s);
+            next22Spare[i] = pool22Spare[s][i] + spareAcc;
+          }
+          pool22Cost[s + 1] = next22Cost;
+          pool22Spare[s + 1] = next22Spare;
+        }
+      }
+    }
 
     const costMap = new Map();
     const destroyMap = new Map();
@@ -74,30 +152,22 @@ export class MarkovEngine {
     for (let sim = 0; sim < simCount; sim++) {
       let star = startStar;
       let spentCost = 0;
-      let consumedEquipCount = 0;
+      spareAcc = 0;
 
-      while (star < targetStar) {
-        const [pSuccess, pMaintain] = probTable[star];
-        spentCost += safeguardRecord[star] ? costs.protected[star] : costs.discounted[star];
-
-        const r = Math.random();
-        if (r < pSuccess) {
+      // 12성 미만: 파괴 없음 (10성 이하 1+1 이벤트 반영)
+      while (star < Math.min(targetStar, 12)) {
+        spentCost += costs.discounted[star];
+        if (Math.random() < probTable[star][0]) {
           star += 1 + (onePlusOneUnder10 && star <= 10 ? 1 : 0);
-        } else if (r < pSuccess + pMaintain) {
-          // 유지
-        } else if (strategies[star] === 'restore') {
-          // 확정복구: 15~22성은 해당 성수, 23성 이상은 22성으로 복구
-          const restoreInfo = restoreInfos[star];
-          consumedEquipCount += restoreInfo.spareCount;
-          spentCost += restoreInfo.totalCost;
-          star = Math.min(star, 22);
-        } else {
-          // 12성 롤백 복구
-          consumedEquipCount += 1;
-          spentCost += baseCost;
-          star = 12;
         }
       }
+
+      // 12성 이상: 단계별 체류 비용 합
+      for (let s = Math.max(star, 12); s < targetStar; s++) {
+        spentCost += sojourn(s);
+      }
+
+      const consumedEquipCount = spareAcc;
 
       // 비용 히스토그램 Binning
       const binIdx = Math.floor(spentCost / binSize);

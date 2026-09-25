@@ -165,9 +165,17 @@ test('칠흑 5부위 22성 결합 분석', () => {
     `p10 ${eok(res.percentiles.p10)} / p50 ${eok(res.percentiles.p50)} / p90 ${eok(res.percentiles.p90)} | ${res.calcTimeMs.toFixed(0)}ms`);
 });
 
-test('다중 분석: 30성 목표도 메모리 폭주 없이 완료', () => {
+test('다중 분석: 22→30성도 표본 수를 유지한 분포 산출 (백분위가 서로 다르고 평균 ≈ 기댓값)', () => {
   const res = MultiAnalyzer.analyze([{ name: '에테르넬', level: 250, startStar: 22, targetStar: 30, baseCost: 15e8, count: 1 }], { event: DEFAULT_EVENT });
   assert.ok(Number.isFinite(res.totalExpCost));
+  assert.equal(res.items[0].simulationCount, 40000, '표본 수 유지');
+  const p = res.percentiles;
+  assert.ok(p.p1 < p.p10 && p.p10 < p.p50 && p.p50 < p.p90 && p.p90 < p.p99, `백분위 단조 증가 ${JSON.stringify(p)}`);
+  let mean = 0;
+  res.totalCostPMF.forEach((prob, i) => { mean += prob * (i + 0.5) * res.binSize; });
+  assertClose(mean, res.totalExpCost, 0.05, '분포 평균 vs 정확 기댓값');
+  const win = res.smithAnalysis.winProb;
+  assert.ok(win > 1 && win < 99, `직작 승률이 0/100%로 붕괴하지 않음 (${win.toFixed(1)}%)`);
 });
 
 // 8. 대장장이 배율 (전체 + 장비별)
