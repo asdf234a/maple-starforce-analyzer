@@ -35,6 +35,5 @@ let singleHtml = html
   .replace('<link rel="stylesheet" href="style.css">', `<style>\n${css}\n</style>`)
   .replace('<script type="module" src="src/app.js"></script>', `<script>\n${bundleJs}\n</script>`);
 
-fs.writeFileSync('maple-starforce-analyzer.html', singleHtml, 'utf-8');
 fs.writeFileSync('index.html', singleHtml, 'utf-8');
-console.log('Single standalone HTML created for BOTH index.html and maple-starforce-analyzer.html (size:', singleHtml.length, 'bytes)');
+console.log('Single standalone HTML created: index.html (size:', singleHtml.length, 'bytes)');
