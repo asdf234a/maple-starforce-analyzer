@@ -7,10 +7,6 @@ import { DEFAULT_EVENT, getAttemptCosts, getProbTable, getRestoreTotalCost, pars
 import { StarforceOptimizer } from './optimizer.js';
 
 export class MarkovEngine {
-  static analyzeItem(item, options = {}, binSize = 10000000) {
-    return this.simulateItem(item, options, 40000, binSize);
-  }
-
   /**
    * 단일 아이템 스타포스 강화 시뮬레이션 및 확률분포 생성
    */
@@ -207,7 +203,6 @@ export class MarkovEngine {
       expDestroys: exactResult.expDestroys * count, // 기대 소모 장비 개수 (확정복구 스페어 포함)
       expDestroyCount: exactResult.expDestroyCount * count, // 기대 파괴 횟수
       expTrials: exactResult.expTrials * count,
-      simulationCount: simCount,
       costPMF,
       destroyPMF,
       binSize
