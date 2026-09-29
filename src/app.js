@@ -20,6 +20,7 @@ const state = {
     smithMultiplier: DEFAULT_SMITH_MULTIPLIER
   },
   costChart: null,
+  lastResult: null,
   destroyChart: null
 };
 
@@ -76,6 +77,25 @@ function formatMeso(amount) {
 }
 
 /**
+ * 좁은 화면(모바일) 여부
+ */
+const compactQuery = window.matchMedia('(max-width: 640px)');
+function isCompact() {
+  return compactQuery.matches;
+}
+
+/**
+ * 차트 축용 짧은 메소 표기 (예: 1.2조, 375억, 5,000만)
+ */
+function formatMesoShort(amount) {
+  const val = Math.round(Number(amount) || 0);
+  if (val >= 1e12) return `${parseFloat((val / 1e12).toFixed(1))}조`;
+  if (val >= 1e8) return `${Math.round(val / 1e8).toLocaleString()}억`;
+  if (val >= 1e4) return `${Math.round(val / 1e4).toLocaleString()}만`;
+  return val.toLocaleString();
+}
+
+/**
  * 만 메소 단위 입력값(예: 32 -> 320,000 메소)을 한글로 포맷팅
  * @param {number} manVal - 만 메소 단위의 수치
  */
@@ -114,6 +134,7 @@ function runAnalysis() {
   const calculatedOptions = getCalculatedOptions();
   const result = MultiAnalyzer.analyze(state.items, calculatedOptions);
 
+  state.lastResult = result;
   renderItemsList();
   renderKpis(result);
   renderCostChart(result);
@@ -262,13 +283,16 @@ function renderCostChart(result) {
 
   const step = Math.max(1, Math.floor(cutoffIdx / 100));
   
+  const compact = isCompact();
   const labels = [];
+  const rawCosts = [];
   const pmfData = [];
   const cdfData = [];
 
   for (let i = 0; i < cutoffIdx; i += step) {
     const cost = i * binSize;
     labels.push(formatMeso(cost));
+    rawCosts.push(cost);
     
     let sumP = 0;
     for (let j = i; j < Math.min(cutoffIdx, i + step); j++) {
@@ -315,7 +339,7 @@ function renderCostChart(result) {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: {
-          labels: { color: '#c9d1d9', font: { size: 12, family: 'Pretendard' } }
+          labels: { color: '#c9d1d9', boxWidth: compact ? 24 : 40, font: { size: 12, family: 'Pretendard' } }
         },
         tooltip: {
           backgroundColor: 'rgba(19, 25, 34, 0.95)',
@@ -338,13 +362,15 @@ function renderCostChart(result) {
       scales: {
         x: {
           grid: { color: 'rgba(255, 255, 255, 0.05)' },
-          ticks: { color: '#8b949e', maxTicksLimit: 8, font: { size: 11, family: 'Pretendard' } }
+          ticks: compact
+            ? { color: '#8b949e', maxTicksLimit: 4, maxRotation: 0, autoSkipPadding: 12, font: { size: 11, family: 'Pretendard' }, callback: (v) => formatMesoShort(rawCosts[v]) }
+            : { color: '#8b949e', maxTicksLimit: 8, font: { size: 11, family: 'Pretendard' } }
         },
         yPDF: {
           position: 'left',
           grid: { color: 'rgba(255, 255, 255, 0.05)' },
           ticks: { color: '#8b949e', callback: (v) => `${v}%`, font: { size: 11, family: 'Pretendard' } },
-          title: { display: true, text: '구간 확률 (%)', color: '#8b949e' }
+          title: { display: !compact, text: '구간 확률 (%)', color: '#8b949e' }
         },
         yCDF: {
           position: 'right',
@@ -352,7 +378,7 @@ function renderCostChart(result) {
           min: 0,
           max: 100,
           ticks: { color: '#388bfd', callback: (v) => `${v}%`, font: { size: 11, family: 'Pretendard' } },
-          title: { display: true, text: '누적 완료율 (%)', color: '#388bfd' }
+          title: { display: !compact, text: '누적 완료율 (%)', color: '#388bfd' }
         }
       }
     }
@@ -380,7 +406,8 @@ function renderDestroyChart(result) {
   }
   stats = stats.slice(0, Math.max(3, cutIdx));
 
-  const labels = stats.map(s => `${s.destroys}개 파괴`);
+  const compact = isCompact();
+  const labels = stats.map(s => (compact ? `${s.destroys}개` : `${s.destroys}개 파괴`));
   const probs = stats.map(s => (s.probability * 100).toFixed(2));
   const cumProbs = stats.map(s => (s.cumulative * 100).toFixed(1));
 
@@ -420,7 +447,7 @@ function renderDestroyChart(result) {
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          labels: { color: '#c9d1d9', font: { size: 11, family: 'Pretendard' } }
+          labels: { color: '#c9d1d9', boxWidth: compact ? 24 : 40, font: { size: compact ? 12 : 11, family: 'Pretendard' } }
         },
         tooltip: {
           backgroundColor: 'rgba(19, 25, 34, 0.95)',
@@ -434,7 +461,7 @@ function renderDestroyChart(result) {
       scales: {
         x: {
           grid: { color: 'rgba(255, 255, 255, 0.05)' },
-          ticks: { color: '#8b949e', font: { size: 11, family: 'Pretendard' } }
+          ticks: { color: '#8b949e', maxRotation: compact ? 0 : 50, autoSkipPadding: compact ? 8 : 3, font: { size: 11, family: 'Pretendard' } }
         },
         yProb: {
           position: 'left',
@@ -491,29 +518,29 @@ function renderTables(result) {
 
     return `
       <tr>
-        <td>
+        <td class="cell-name">
           <div style="font-weight:700; color:#f0f6fc;">${r.name}</div>
           <div class="item-strategy-container">
             <div class="strategy-group">${safeBadges}</div>
             <div class="strategy-group">${restoreBadges}</div>
           </div>
         </td>
-        <td>${r.item.level}제</td>
-        <td><span class="star-range">${r.item.startStar}성 → ${r.item.targetStar}성</span></td>
-        <td>${r.count}개</td>
-        <td>${formatMeso(r.item.baseCost)}</td>
-        <td>
+        <td data-label="레벨">${r.item.level}제</td>
+        <td data-label="성수 구간"><span class="star-range">${r.item.startStar}성 → ${r.item.targetStar}성</span></td>
+        <td data-label="수량">${r.count}개</td>
+        <td data-label="노작 가격">${formatMeso(r.item.baseCost)}</td>
+        <td data-label="기대 비용">
           <div style="font-weight:700; color:var(--accent-gold);">${formatMeso(r.expCost)}</div>
         </td>
-        <td>
+        <td data-label="대장장이 (${formatSmithMultiplier(r.smithAnalysis ? r.smithAnalysis.multiplier : state.options.smithMultiplier)})">
           ${r.expCost > 0 && r.smithAnalysis ? `
             <div class="item-smith-cost">${formatMeso(r.smithAnalysis.smithCost)}</div>
             <div class="item-smith-sub">직작 승률 ${r.smithAnalysis.winProb.toFixed(1)}%</div>
           ` : '<span class="item-smith-sub">-</span>'}
         </td>
-        <td>
+        <td data-label="평균 파괴">
           <span style="color:#ff7b72; font-weight:700;">${r.expDestroys.toFixed(3)}개</span>
-          <div style="font-size:11px; color:#8b949e;">파괴 ${(r.expDestroyCount || 0).toFixed(3)}회 · 평균 ${r.expTrials ? r.expTrials.toFixed(1) : '0'}회 시도</div>
+          <div class="item-smith-sub">파괴 ${(r.expDestroyCount || 0).toFixed(3)}회 · 평균 ${r.expTrials ? r.expTrials.toFixed(1) : '0'}회 시도</div>
         </td>
       </tr>
     `;
@@ -541,9 +568,9 @@ function renderTables(result) {
     const isSmith = row.label.includes('대장장이');
     return `
       <tr ${isSmith ? 'style="background: rgba(230, 162, 60, 0.12); border-left: 3px solid #e6a23c;"' : ''}>
-        <td><span class="percentile-tag ${row.tag}">${row.label}</span></td>
-        <td style="${isSmith ? 'color:#e6a23c; font-weight:600;' : 'color:#8b949e;'}">${row.meaning}</td>
-        <td>
+        <td class="perc-label"><span class="percentile-tag ${row.tag}">${row.label}</span></td>
+        <td class="perc-desc" style="${isSmith ? 'color:#e6a23c; font-weight:600;' : 'color:#8b949e;'}">${row.meaning}</td>
+        <td class="perc-val">
           <strong style="${isSmith ? 'color:#e6a23c;' : ''}">${formatMeso(row.val)}</strong>
         </td>
       </tr>
@@ -1021,6 +1048,13 @@ window.openItemModal = openItemModal;
 window.closeItemModal = closeItemModal;
 
 // 초기화
+// 화면 폭이 모바일 ↔ PC 경계를 넘으면 차트만 다시 그리기
+compactQuery.addEventListener('change', () => {
+  if (!state.lastResult) return;
+  renderCostChart(state.lastResult);
+  renderDestroyChart(state.lastResult);
+});
+
 function bootstrap() {
   renderCustomPresetChips();
   initModalLevelChips();
